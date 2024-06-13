@@ -8,6 +8,19 @@ from src import GraphGenerator as gg
 from src import LinAlg as la
 from src import Plotting as pl
 from src import Equilibirium as eq
+import time
+
+
+def dict_add(d1, d2):
+    if d1.keys() != d2.keys():
+        raise ValueError("Keys of the dictionaries are not the same")
+    return {k: d1[k] + d2[k] for k in d1.keys()}
+
+
+def dict_subtract(d1, d2):
+    if d1.keys() != d2.keys():
+        raise ValueError("Keys of the dictionaries are not the same")
+    return {k: d1[k] - d2[k] for k in d1.keys()}
 
 
 def convex_optimization_linflow(G):
@@ -57,8 +70,8 @@ def convex_optimization_TAP(G):
     for path in all_paths:
         for k, v in ddict.items():
             if (path[0], path[-1]) == k:
-                ddict[k] += 1
-
+                ddict[k] = 1.0
+                break
     d = np.array(list(ddict.values()))
     d *= total_load / sum(d)
 
@@ -94,36 +107,65 @@ def convex_optimization_TAP(G):
 
 
 # %%
-source, target = ["a", "b", "h"], ["c", "j", "f"]
-total_load = 100
-# Example graph creation
-U = gg.random_graph(source, target, total_load, seed=42)
-G = gg.to_directed_flow_graph(U)
-
-cv_lin_flow = convex_optimization_linflow(G)
-cv_tap_flow = convex_optimization_TAP(G)
-# nx.set_edge_attributes(G, dict(zip(G.edges, cv_tap_flow)), "tap_flow")
-# pl.graphPlotCC(G, cc="flow")
-nx.set_edge_attributes(G, dict(zip(G.edges, cv_lin_flow)), "flow")
-# %%
-pathflows = list(la.path_flows(G).values())
-delta = la.path_link_incidence_matrix(G)
-gamma = la.od_path_incidence_matrix(G)
-
-delta @ pathflows
-
-# %%
 
 if __name__ == "__main__":
+    source, target = ["a", "b", "e", "k", "g"], ["j", "c", "d", "f"]
+    total_load = 1000
+    # Example graph creation
+    U = gg.random_graph(source, target, total_load, seed=42, num_nodes=20, num_edges=30)
+    G = gg.to_directed_flow_graph(U)
 
+    # test_cv(G)
+    pl.graphPlotCC(G, cc="flow")
+
+    # %%
+
+    # big graph timings
+    source, target = ["a"], ["b"]
+    U = gg.random_graph(
+        source, target, total_load, seed=42, num_nodes=200, num_edges=300
+    )
+    G = gg.to_directed_flow_graph(U)
+    print(G)
+
+    start_time = time.time()
+    eq.linear_flow(G)
+    la_lin_flow_time = time.time() - start_time
+
+    print("L^-1: ", la_lin_flow_time, "s")
+
+    start_time = time.time()
     cv_lin_flow = convex_optimization_linflow(G)
+    cv_lin_flow_time = time.time() - start_time
+    print("CVO of KCL: ", cv_lin_flow_time, "s")
+
+    start_time = time.time()
     cv_tap_flow = convex_optimization_TAP(G)
+    cv_tap_flow_time = time.time() - start_time
+    print("CVO of TAP: ", cv_tap_flow_time, "s")
 
-    if all(np.abs((list(eq.linear_flow(G).values()) - cv_lin_flow) < 1e-5)):
-        print("Convex optimization yields similar results than LA")
+    print(
+        "CVO of KCL is factor {} faster than CVO of TAP".format(
+            cv_tap_flow_time / cv_lin_flow_time
+        )
+    )
 
-    if all(np.abs(cv_tap_flow - cv_lin_flow) < 1e-5):
-        print("Convex optimization of linFlow yields similar results than TAP")
+    print(
+        "L^-1 is factor {} faster than CVO of KCL".format(
+            cv_lin_flow_time / la_lin_flow_time
+        )
+    )
+    # np.abs(cv_tap_flow - cv_lin_flow) < 1e-5
+    # %%
+    pathflows = list(la.path_flows(G).values())
+    delta = la.path_link_incidence_matrix(G)
+    gamma = la.od_path_incidence_matrix(G)
 
+    # %%
 
-# %%
+    D = gamma @ pathflows
+    od_pairs = list(itertools.product(G.source_nodes, G.target_nodes))
+
+    dict(zip(od_pairs, D))
+
+    # %%

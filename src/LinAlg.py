@@ -152,6 +152,3 @@ if __name__ == "__main__":
         print("ERROR")
 
     # %%
-    od_path_matrix @ list(pathflow.values())
-
-    # %%

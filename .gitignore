@@ -2,3 +2,7 @@
 
  *.pdf
  *.png
+
+#folders
+src/__pycache__
+test/__pycache__

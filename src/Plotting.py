@@ -187,9 +187,11 @@ def graphPlotCC(graph, ax=None, cc="flow"):
     if len(node_colors) == 0:
         node_colors = {n: "lightgrey" for n in graph.nodes()}
 
-    nx.draw_networkx_nodes(graph, pos, ax=ax, node_color=node_colors.values())
-    nx.draw_networkx_labels(graph, pos, ax=ax)
-
+    if len(graph.nodes) < 25:
+        nx.draw_networkx_nodes(graph, pos, ax=ax, node_color=node_colors.values())
+        nx.draw_networkx_labels(graph, pos, ax=ax)
+    else:
+        nx.draw_networkx_nodes(graph, pos, ax=ax, node_color=node_colors.values())
     for u, v in graph.edges():
         if (v, u) in graph.edges():
             # Draw with curvature if bidirectional
@@ -216,11 +218,12 @@ def graphPlotCC(graph, ax=None, cc="flow"):
     cbar = plt.colorbar(
         mpl.cm.ScalarMappable(norm=norm, cmap=cmap),
         ax=ax,
-        pad=0.01,
+        pad=0.0,
         aspect=20,
         shrink=1 / 2,
         extend="min",
     )
+    cbar.set_label(r"$F_{i \rightarrow j}$")
     try:
         sc = int(round(eq.total_social_cost(graph, "flow")))
         ax.set_title(f"Social Cost: {sc}", fontsize=12)
