@@ -21,27 +21,27 @@ def source_sink_dict(G):
             else:
                 od_has_path[(s, d)] = False
 
-    # pl.graphPlotCC(G, cc="flow")
-
     Ptot = dict(zip(G.nodes, np.zeros(G.number_of_nodes())))
     for (s, d), has_path in od_has_path.items():
         if has_path:
-            # print(f"Path from {s} to {d} exists")
-            # P = nx.get_node_attributes(G, "P")
             for k, v in Ptot.items():
                 if k == s:
                     Ptot[k] += total_load / num_od_pairs
                 elif k == d:
                     Ptot[k] += -total_load / num_od_pairs
 
-        # else:
-        #    print(f"Path from {s} to {d} does not exist")
-
     return Ptot
 
 
 def random_graph(
-    source_nodes, target_nodes, total_load, num_nodes=10, num_edges=15, seed=42
+    source_nodes,
+    target_nodes,
+    total_load,
+    num_nodes=10,
+    num_edges=15,
+    seed=42,
+    alpha=1,
+    beta=0,
 ):
     connected = False
     if num_edges < num_nodes - 1:
@@ -57,19 +57,36 @@ def random_graph(
     U.target_nodes = target_nodes
     U.total_load = total_load
 
-    tt_func = {edge: lambda n: n for edge in U.edges}
+    if alpha == "random":
+        np.random.seed(seed)
+        alpha = np.random.uniform(0.1, 1, U.number_of_edges())
+    if beta == "random":
+        np.random.seed(seed)
+        beta = np.random.randint(1, 10, U.number_of_edges())
+
+    if isinstance(alpha, (int, float)):
+        alpha = alpha * np.ones(U.number_of_edges())
+    if isinstance(beta, (int, float)):
+        beta = beta * np.ones(U.number_of_edges())
+
+    tt_func = {
+        edge: (lambda alpha, beta: lambda n: alpha * n + beta)(alpha[e], beta[e])
+        for e, edge in enumerate(U.edges)
+    }
+    # test = {edge: beta[e] for e, edge in enumerate(U.edges)}
     nx.set_edge_attributes(U, tt_func, "tt_function")
-    weights = {edge: 1 for edge in U.edges}
+
+    if sum(alpha) > 0:
+        weights = {
+            edge: 1 / alpha[e] if alpha[e] != 0 else 0 for e, edge in enumerate(U.edges)
+        }
+    else:
+        weights = {edge: 1 for edge in U.edges}
     nx.set_edge_attributes(U, weights, "weight")
 
     # G = to_directed(U)
     pos = nx.spring_layout(U, seed=seed)
     nx.set_node_attributes(U, pos, "pos")
-
-    # nodes_dict = dict(zip(U.nodes, [i for i in range(U.number_of_nodes())]))
-
-    # start_node_int = [nodes_dict[s] for s in source_nodes]
-    # end_node_int = [nodes_dict[t] for t in target_nodes]
 
     P = source_sink_dict(U)
     nx.set_node_attributes(U, P, "P")
@@ -125,7 +142,13 @@ def to_directed_flow_graph(G):
 if __name__ == "__main__":
     sources = ["a", "b"]
     targets = ["c", "h"]
-    G = random_graph(sources, targets, 1000)
+    G = random_graph(sources, targets, 1000, beta="random", alpha="random")
     G = to_directed_flow_graph(G)
     pl.graphPlotCC(G, cc="flow")
+    # %%
+
+    f = nx.get_edge_attributes(G, "tt_function")
+    betas = np.array([f[e](0) for e in G.edges()])
+    alphas = np.array([f[e](1) - f[e](0) for e in G.edges()])
+    print(betas, alphas)
 # %%

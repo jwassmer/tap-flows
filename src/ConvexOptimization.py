@@ -9,6 +9,7 @@ from src import LinAlg as la
 from src import Plotting as pl
 from src import Equilibirium as eq
 import time
+from scipy.optimize import linprog
 
 
 def dict_add(d1, d2):
@@ -23,7 +24,7 @@ def dict_subtract(d1, d2):
     return {k: d1[k] - d2[k] for k in d1.keys()}
 
 
-def convex_optimization_linflow(G):
+def convex_optimization_linflow(G, weight="weight"):
     # Get the number of edges and nodes
     num_edges = G.number_of_edges()
 
@@ -31,9 +32,9 @@ def convex_optimization_linflow(G):
     E = -nx.incidence_matrix(G, oriented=True).toarray()
 
     # Define the weight vector K_e (from adjacency matrix weights)
-    K = np.array([G[u][v]["weight"] for u, v in G.edges()])
+    K = np.array([G[u][v][weight] for u, v in G.edges()])
 
-    P = list(nx.get_node_attributes(G, "P").values())
+    P = np.array(list(nx.get_node_attributes(G, "P").values()))
 
     # Define the flow variable f_e
     f = cp.Variable(num_edges)
@@ -42,13 +43,49 @@ def convex_optimization_linflow(G):
     objective = cp.Minimize(cp.sum(cp.multiply(f**2, 1 / (2 * K))))
 
     # Constraints: E @ f = p
-    constraints = [E @ f == P, f >= np.zeros(num_edges)]
+    constraints = [E @ f == P]
 
     # Define the problem
     problem = cp.Problem(objective, constraints)
 
     # Solve the problem
     problem.solve()
+
+    # Get the results
+    flow_values = f.value
+
+    flow_values, problem.value
+    return flow_values
+
+
+def convex_optimization_kcl_tap(G, solver=cp.OSQP, verbose=False):
+    # Get the number of edges and nodes
+    num_edges = G.number_of_edges()
+
+    # Create the edge incidence matrix E
+    E = -nx.incidence_matrix(G, oriented=True).toarray()
+
+    tt_funcs = nx.get_edge_attributes(G, "tt_function")
+    betas = np.array([tt_funcs[e](0) for e in G.edges()])
+    alphas = np.array([tt_funcs[e](1) - tt_funcs[e](0) for e in G.edges()])
+
+    P = list(nx.get_node_attributes(G, "P").values())
+
+    # Define the flow variable f_e
+    f = cp.Variable(num_edges)
+
+    # Objective function: minimize sum of (f_e^2 / (2 * K_e))
+    objective = cp.Minimize(alphas @ f**2 / 2 + betas @ f)
+    # objective = cp.Minimize(cp.sum(cp.abs(f**3)))
+
+    # Constraints: E @ f = p
+    constraints = [E @ f == P, f >= np.zeros(num_edges)]
+
+    # Define the problem
+    problem = cp.Problem(objective, constraints)
+
+    # Solve the problem
+    problem.solve(solver=solver, verbose=verbose)
 
     # Get the results
     flow_values = f.value
@@ -87,7 +124,11 @@ def convex_optimization_TAP(G):
     f = cp.Variable(num_edges)
     h = cp.Variable(num_paths)
 
-    objective = cp.Minimize(cp.sum(alphas @ f**2 / 2 + betas @ f))
+    objective = cp.Minimize(
+        cp.sum(cp.multiply(alphas, f**2) / 2 + cp.multiply(betas, f))
+    )
+    # objective = cp.Minimize(cp.sum(f))
+
     constraints = [
         delta @ h == f,
         gamma @ h == d,
@@ -106,24 +147,76 @@ def convex_optimization_TAP(G):
     return flow_values
 
 
+def linear_program(G):
+    start_time = time.time()
+    num_edges = G.number_of_edges()
+    E = -nx.incidence_matrix(G, oriented=True)  # .toarray()
+
+    tt_funcs = nx.get_edge_attributes(G, "tt_function")
+    betas = np.array([tt_funcs[e](0) for e in G.edges()])
+    weights = np.array([G[u][v]["weight"] for u, v in G.edges()])
+    bounds = np.array([(0, None) for _ in range(num_edges)])
+
+    P = np.array(list(nx.get_node_attributes(G, "P").values()))
+
+    # kcl_flow = co.convex_optimization_kcl_tap(G, solver=cp.SCS)
+    result = linprog(weights, A_eq=E, b_eq=P, bounds=bounds, method="highs")
+    kcl_flow = result.x
+    # kcl_flow = co.linear_program(G)
+
+    linprog_time = time.time() - start_time
+
+    print("Time:", linprog_time, "s")
+    return kcl_flow
+
+
 # %%
 
 if __name__ == "__main__":
-    source, target = ["a", "b", "e", "k", "g"], ["j", "c", "d", "f"]
-    total_load = 1000
+    source, target = ["f"], ["g"]
+    total_load = 10000
     # Example graph creation
-    U = gg.random_graph(source, target, total_load, seed=42, num_nodes=20, num_edges=30)
+    U = gg.random_graph(
+        source,
+        target,
+        total_load,
+        seed=42,
+        num_nodes=7,
+        num_edges=7,
+        alpha="random",
+        beta="random",
+    )
+    oneweights = {e: 1 for e in U.edges()}
+    nx.set_edge_attributes(U, oneweights, "weight")
     G = gg.to_directed_flow_graph(U)
 
     # test_cv(G)
-    pl.graphPlotCC(G, cc="flow")
+
+    # %%
+
+    lin_flow = convex_optimization_linflow(G)
+
+    tap_flow = convex_optimization_TAP(G)
+
+    kcl_flow = convex_optimization_kcl_tap(G)
+
+    print(np.abs(tap_flow - kcl_flow))
+
+    pl.graphPlotCC(G, cc=tap_flow)
 
     # %%
 
     # big graph timings
     source, target = ["a"], ["b"]
     U = gg.random_graph(
-        source, target, total_load, seed=42, num_nodes=200, num_edges=300
+        source,
+        target,
+        total_load,
+        seed=42,
+        num_nodes=200,
+        num_edges=300,
+        alpha="random",
+        beta="random",
     )
     G = gg.to_directed_flow_graph(U)
     print(G)
@@ -169,3 +262,5 @@ if __name__ == "__main__":
     dict(zip(od_pairs, D))
 
     # %%
+
+# x*(alpha*x+beta)

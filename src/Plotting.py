@@ -162,14 +162,22 @@ def graphPlot(graph, ax=None):
     return ax
 
 
-def graphPlotCC(graph, ax=None, cc="flow"):
+def graphPlotCC(graph, ax=None, cc="flow", nc=None):
     if ax is None:
         fig, ax = plt.subplots(figsize=(6, 4))
 
     # tt_func = nx.get_edge_attributes(graph, "tt_function")
     # weights = nx.get_edge_attributes(graph, "weight")
     pos = nx.get_node_attributes(graph, "pos")
-    flows = nx.get_edge_attributes(graph, cc)
+    if isinstance(cc, str):
+        flows = nx.get_edge_attributes(graph, cc)
+    elif isinstance(cc, list):
+        flows = dict(zip(graph.edges(), cc))
+    elif isinstance(cc, np.ndarray):
+        flows = dict(zip(graph.edges(), cc))
+    elif isinstance(cc, dict):
+        flows = cc
+    # elif cc
 
     cmap = plt.get_cmap("viridis")
     cmap.set_under("lightgrey")
@@ -183,15 +191,24 @@ def graphPlotCC(graph, ax=None, cc="flow"):
     norm = mpl.colors.LogNorm(vmin=vmin, vmax=vmax)
 
     edge_colors = {e: cmap(norm(flows[e])) for e in graph.edges()}
-    node_colors = nx.get_node_attributes(graph, "color")
+    if nc is None:
+        node_colors = nx.get_node_attributes(graph, "color")
+    elif isinstance(nc, str):
+        node_colors = dict(zip(graph.nodes(), [nc] * graph.number_of_nodes()))
+
     if len(node_colors) == 0:
         node_colors = {n: "lightgrey" for n in graph.nodes()}
 
     if len(graph.nodes) < 25:
-        nx.draw_networkx_nodes(graph, pos, ax=ax, node_color=node_colors.values())
+        nx.draw_networkx_nodes(
+            graph,
+            pos,
+            ax=ax,
+            node_color=node_colors.values(),
+        )
         nx.draw_networkx_labels(graph, pos, ax=ax)
     else:
-        nx.draw_networkx_nodes(graph, pos, ax=ax, node_color=node_colors.values())
+        nx.draw_networkx_nodes(graph, pos, ax=ax, node_color="lightgrey", node_size=0)
     for u, v in graph.edges():
         if (v, u) in graph.edges():
             # Draw with curvature if bidirectional

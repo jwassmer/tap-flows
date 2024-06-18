@@ -94,7 +94,6 @@ def path_time(path):
     return path_time
 
 
-
 def user_equilibrium(G, start_nodes, end_nodes):
     if type(start_nodes) == int:
         start_nodes = [start_nodes]
@@ -168,21 +167,24 @@ def user_equilibrium(G, start_nodes, end_nodes):
 def to_undirected(graph, weight="weight"):
     U = nx.Graph()
     U.add_nodes_from(graph.nodes)
-    for i, j, w in graph.edges(data=weight):
+    for i, j, data in graph.edges(data=True):
+        w = data[weight]
         if U.has_edge(i, j):
-            current_weight = U.edges[i, j]["weight"]
+            current_weight = U.edges[i, j][weight]
             if w > current_weight:
-                U.edges[i, j]["weight"] = w
+                U.edges[i, j][weight] = w
         else:
-            U.add_edge(i, j, weight=w)
+            U.add_edge(i, j, **data)
     return U
 
 
-def linear_flow(G):
-    P = nx.get_node_attributes(G, "P")
-    # print(P)
-    P_vec = np.array(list(P.values()))
-    return linear_flow_solver(G, P_vec)
+def linear_flow(G, weight="weight", P=None):
+    if P is None:
+        Pdict = nx.get_node_attributes(G, "P")
+        P = np.array(list(Pdict.values()))
+    # I = nx.incidence_matrix(G, oriented=True, weight="weight")
+    # return np.linalg.pinv(I.toarray()) @ P_vec
+    return linear_flow_solver(G, P, weight=weight)
 
 
 def phases(G):
@@ -191,24 +193,26 @@ def phases(G):
     return phase_solver(G, P_vec)
 
 
-def linear_flow_solver(G, P):
+def linear_flow_solver(G, P, weight="weight"):
     if nx.is_directed(G):
-        L = nx.laplacian_matrix(to_undirected(G), weight="weight")
+        gamma = 1 / 2
+        # L = nx.laplacian_matrix(to_undirected(G, weight=weight), weight=weight)
     else:
-        L = nx.laplacian_matrix(G, weight="weight")
+        gamma = 1
+    L = nx.laplacian_matrix(G, weight=weight)
 
     # L = nx.laplacian_matrix(to_undirected(G), weight="weight")
-    psi = np.linalg.pinv(L.toarray(), hermitian=True) @ P
+    psi = np.linalg.pinv(L.toarray()) @ P
     nx.set_node_attributes(G, dict(zip(G.nodes(), psi)), "psi")
 
-    incidence = -nx.incidence_matrix(G, oriented=True, weight="weight")
+    incidence = -nx.incidence_matrix(G, oriented=True, weight=weight)
 
-    return dict(zip(G.edges(), incidence.T @ psi))
+    return dict(zip(G.edges(), gamma * incidence.T @ psi))
 
 
 def phase_solver(G, P):
     L = nx.laplacian_matrix(to_undirected(G), weight="weight")
-    psi = np.linalg.pinv(L.toarray(), hermitian=True) @ P
+    psi = np.linalg.pinv(L.toarray()) @ P
     return psi
 
 

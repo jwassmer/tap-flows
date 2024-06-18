@@ -5,11 +5,24 @@ import matplotlib.pyplot as plt
 
 from src import Equilibirium as eq
 from src import Plotting as pl
+from src import ConvexOptimization as co
 
-pl.mpl_params(fontsize=32)
+pl.mpl_params(fontsize=14)
 
 
 # %%
+def get_alpha(G):
+    alpha = np.array([G[u][v]["tt_function"](0) for u, v in G.edges()])
+    return dict(zip(G.edges(), alpha))
+
+
+def get_beta(G):
+    beta = np.array(
+        [G[u][v]["tt_function"](1) - G[u][v]["tt_function"](0) for u, v in G.edges()]
+    )
+    return dict(zip(G.edges(), beta))
+
+
 def updateEdgeWeights(G):
     lambda_funcs = nx.get_edge_attributes(G, "tt_function")
     nash_flow = nx.get_edge_attributes(G, "load")
@@ -31,6 +44,9 @@ def linear_function(alpha, beta, x):
 
 def build_graph(start_node, end_node, total_load):
     G = nx.DiGraph()
+    G.source_nodes = [start_node]
+    G.target_nodes = [end_node]
+    G.total_load = total_load
 
     a, b, c, d, e, f = "a", "b", "c", "d", "e", "f"
 
@@ -49,7 +65,7 @@ def build_graph(start_node, end_node, total_load):
             (b, d, {"tt_function": lambda n: 20}),
             (a, c, {"tt_function": lambda n: 20}),
             (c, d, {"tt_function": lambda n: n / 100 + 10}),
-            (b, c, {"tt_function": lambda n: 1}),
+            (b, c, {"tt_function": lambda n: 0}),
         ]
     )
 
@@ -86,52 +102,82 @@ def build_graph(start_node, end_node, total_load):
 start_node, end_node = "a", "d"
 total_load = 1000
 G = build_graph(start_node, end_node, total_load)
-G = eq.assign_initial_loads(G, start_node, end_node, total_load)
-G, Utot, SCtot = eq.user_equilibrium(G, start_node, end_node)
 
-G = updateEdgeWeights(G)
+tapflow = co.convex_optimization_kcl_tap(G)
+nx.set_edge_attributes(G, dict(zip(G.edges, tapflow)), "tapflow")
 
-F = eq.linear_flow(G)
-nx.set_edge_attributes(G, F, "flow")
-
-
-print("Total potential energy, linflow: ", eq.total_potential_energy(G, "flow"))
-print("Total potential energy, nash TAP: ", eq.total_potential_energy(G, "load"))
-print(eq.total_potential_energy(G, "load") <= eq.total_potential_energy(G, "load"))
-print("The Social Cost is: ", eq.total_social_cost(G, "load"))
-
+pl.graphPlotCC(G, cc=tapflow)
+print(eq.total_social_cost(G, kwd="tapflow"))
+tapflow
 
 # %%
 
-fig, ax = plt.subplots(1, figsize=(6, 4))
-pl.graphPlot(G, ax=ax)
-ax.annotate(
-    r"$\textbf{(a)}$",
-    xy=(0.15, 0.85),
-    xycoords="axes fraction",
-    fontsize=16,
-    fontweight="bold",
-)
+scs = []
+energies = []
+betas = np.linspace(0, 15, num=100)
+for beta in betas:
+    G.edges[("b", "c")]["tt_function"] = lambda n: beta
+    tapflow = co.convex_optimization_kcl_tap(G)
+    nx.set_edge_attributes(G, dict(zip(G.edges, tapflow)), "tapflow")
+    social_cost = eq.total_social_cost(G, kwd="tapflow") / G.total_load
+    energy = eq.total_potential_energy(G, kwd="tapflow") / G.total_load
+    scs.append(social_cost)
+    energies.append(energy)
 
-ax = fig.add_axes([1, 0.1, 0.33, 0.8])
-ax.scatter(range(len(Utot)), Utot, label=r"$U_{tot}$")
-ax.scatter(range(len(SCtot)), SCtot, label=r"$SC_{tot}$")
-ax.tick_params(axis="both", which="major", labelsize=12)
-ax.set_xlabel("Iteration", fontsize=12)
-ax.legend(fontsize=12)
+
+fig, ax = plt.subplots(figsize=(6, 4))
+ax.plot(betas, scs, label="Social Cost")
+ax.plot(betas, energies, label="Potential Energy")
+ax.legend()
 ax.grid()
-ax.ticklabel_format(useOffset=False)
-ax.yaxis.tick_right()
-ax.annotate(
-    r"$\textbf{(b)}$",
-    xy=(0.02, 1.03),
-    xycoords="axes fraction",
-    fontsize=16,
-    fontweight="bold",
-)
+ax.set_xlabel("Beta")
+# %%
+
+import cvxpy as cp
+
+start_node, end_node = "a", "d"
+total_load = 1000
+G = build_graph(start_node, end_node, total_load)
 
 
-# fig.savefig("figs/braess-example.pdf", bbox_inches="tight")
+# Get the number of edges and nodes
+num_edges = G.number_of_edges()
+
+# Create the edge incidence matrix E
+E = -nx.incidence_matrix(G, oriented=True).toarray()
+
+tt_funcs = nx.get_edge_attributes(G, "tt_function")
+betas = np.array([tt_funcs[e](0) for e in G.edges()])
+alphas = np.array([tt_funcs[e](1) - tt_funcs[e](0) for e in G.edges()])
+
+P = list(nx.get_node_attributes(G, "P").values())
+
+# Define the flow variable f_e
+f = cp.Variable(num_edges)
+
+# Objective function: minimize sum of (f_e^2 / (2 * K_e))
+# objective = cp.Minimize(alphas @ f**2 / 2 + betas @ f)
+objective = cp.Minimize(cp.sum(cp.multiply(f**2, alphas) + cp.multiply(f, betas)))
+
+# Constraints: E @ f = p
+constraints = [E @ f == P, f >= np.zeros(num_edges)]
+
+# Define the problem
+problem = cp.Problem(objective, constraints)
+
+# Solve the problem
+problem.solve()
+
+# Get the results
+flow_values = f.value
+
+nx.set_edge_attributes(G, dict(zip(G.edges, flow_values)), "flow")
+print(eq.total_social_cost(G, kwd="flow") / G.total_load)
+flow_values
+# %%
+
+tapflow / flow_values
+# %%
 
 
 # %%
