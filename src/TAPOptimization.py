@@ -171,8 +171,6 @@ def random_graph(
 def linearTAP(G, P):
     """
     Calculate the linear TAP solution for a given graph G and OD matrix P.
-    ATM does not return positive flows only.
-    ATM only works for directed graphs with symmetric edges.
     """
     num_nodes = G.number_of_nodes()
     tt_f = nx.get_edge_attributes(G, "tt_function")
