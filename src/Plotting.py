@@ -162,7 +162,7 @@ def graphPlot(graph, ax=None):
     return ax
 
 
-def graphPlotCC(graph, ax=None, cc="flow", nc=None):
+def graphPlotCC(graph, ax=None, cc="flow", nc=None, norm="LogNorm"):
     if ax is None:
         fig, ax = plt.subplots(figsize=(6, 4))
 
@@ -179,16 +179,22 @@ def graphPlotCC(graph, ax=None, cc="flow", nc=None):
         flows = cc
     # elif cc
 
-    cmap = plt.get_cmap("viridis")
-    cmap.set_under("lightgrey")
-    cmap.set_bad("lightgrey")
     vmax = max(flows.values())
 
     vmin0 = min(flows.values())
     vmin1 = vmax / 1000
     vmin = max(vmin0, vmin1)
 
-    norm = mpl.colors.LogNorm(vmin=vmin, vmax=vmax)
+    if norm == "LogNorm":
+        cmap = plt.get_cmap("viridis")
+        cmap.set_under("lightgrey")
+        cmap.set_bad("lightgrey")
+        norm = mpl.colors.LogNorm(vmin=vmin, vmax=vmax)
+    elif norm == "SymLogNorm":
+        cmap = plt.get_cmap("coolwarm")
+        norm = mpl.colors.SymLogNorm(
+            linthresh=0.03, linscale=0.03, vmin=vmin, vmax=vmax
+        )
 
     edge_colors = {e: cmap(norm(flows[e])) for e in graph.edges()}
     if nc is None:

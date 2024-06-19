@@ -6,38 +6,83 @@ from src import ConvexOptimization as cv
 from src import GraphGenerator as gg
 from src import LinAlg as la
 
-import unittest
+import pytest
 import numpy as np
 from src import ConvexOptimization as cv
 
 
-class TestConvexOptimization(unittest.TestCase):
-    def test_cv(self):
-        # Create a test graph
-        source, target = ["a", "b", "e", "k", "g"], ["j", "c", "d", "f"]
-        total_load = 1000
-        # Example graph creation
-        U = gg.random_graph(
-            source, target, total_load, seed=42, num_nodes=20, num_edges=30
-        )
-        G = gg.to_directed_flow_graph(U)
+@pytest.mark.parametrize(
+    "num_nodes, edge_prob, seed",
+    [
+        (10, 0.2, 42),
+        (15, 0.3, 24),
+        (20, 0.5, 10),
+    ],
+)
+def test_convex_optimization_linflow(num_nodes, edge_prob, seed):
+    # Set the random seed for reproducibility
+    np.random.seed(seed)
 
-        # Call the function under test
-        cv_lin_flow = cv.convex_optimization_linflow(G)
-        cv_tap_flow = cv.convex_optimization_TAP(G)
+    # Create a random Erdős-Rényi graph
+    G = nx.erdos_renyi_graph(num_nodes, edge_prob, seed=seed, directed=False)
 
-        # Perform assertions
-        la_linflow = la_linflow = list(eq.linear_flow(G).values())
-        self.assertTrue(
-            all(np.abs(la_linflow - cv_lin_flow) < 1e-5),
-            "Convex optimization of KCL yields similar results than LA",
-        )
+    # Initialize the supply/demand vector
+    P = np.zeros(G.number_of_nodes())
+    P[0], P[-1] = 100, -100
 
-        self.assertTrue(
-            all(np.abs(cv_tap_flow - cv_lin_flow) < 1e-5),
-            "Convex optimization of KCL yields similar results than TAP",
-        )
+    # Initialize the capacity vector
+    K = np.random.rand(G.number_of_edges())
+    K = np.ones(G.number_of_edges())  # Setting all capacities to 1 for simplicity
+
+    # Compute the convex optimization flow without setting attributes
+    fco0 = cv.convex_optimization_linflow(G, P, K)
+
+    # Set the graph attributes for capacities and supply/demand
+    nx.set_edge_attributes(G, dict(zip(G.edges, K)), "weight")
+    nx.set_node_attributes(G, dict(zip(G.nodes, P)), "P")
+
+    # Compute the convex optimization flow using the graph attributes
+    fco1 = cv.convex_optimization_linflow(G)
+
+    # Check if the two computed flows are almost equal
+    assert all(
+        np.abs(fco0 - fco1) < 1e-5
+    ), "Mismatch between flows computed with and without graph attributes"
+
+    # Compute the linear flow using equilibrium calculations
+    flin = eq.linear_flow(G)
+
+    # Check if the convex optimization flow is almost equal to the linear flow
+    assert all(
+        np.abs(fco0 - list(flin.values())) < 1e-5
+    ), "Mismatch between convex optimization flow and linear flow"
 
 
+# )
+
+
+# %%
 if __name__ == "__main__":
-    unittest.main()
+    seed = 42
+    np.random.seed(seed)
+    G = nx.erdos_renyi_graph(10, 0.2, seed=seed, directed=False)
+    P = np.zeros(G.number_of_nodes())
+    P[0], P[-1] = 100, -100
+    K = np.random.rand(G.number_of_edges())
+    K = np.ones(G.number_of_edges())
+    # nx.draw(G)
+    fco0 = cv.convex_optimization_linflow(G, P, K)
+    nx.set_edge_attributes(G, dict(zip(G.edges, K)), "weight")
+    nx.set_node_attributes(G, dict(zip(G.nodes, P)), "P")
+    fco1 = cv.convex_optimization_linflow(G)
+    result0 = all(np.abs(fco0 - fco1) < 1e-5)
+
+    assert result0 == True
+
+    flin = eq.linear_flow(G)
+
+    result1 = all(np.abs(fco0 - list(flin.values())) < 1e-5)
+    assert result1 == True
+
+    # flin = eq.linear_flow(G, P)
+# %%

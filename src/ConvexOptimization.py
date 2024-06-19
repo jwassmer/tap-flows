@@ -24,17 +24,21 @@ def dict_subtract(d1, d2):
     return {k: d1[k] - d2[k] for k in d1.keys()}
 
 
-def convex_optimization_linflow(G, weight="weight"):
+def convex_optimization_linflow(G, P=None, K=None, weight="weight"):
     # Get the number of edges and nodes
     num_edges = G.number_of_edges()
 
     # Create the edge incidence matrix E
     E = -nx.incidence_matrix(G, oriented=True).toarray()
 
-    # Define the weight vector K_e (from adjacency matrix weights)
-    K = np.array([G[u][v][weight] for u, v in G.edges()])
+    if K is None and isinstance(weight, str):
+        K = np.array([G[u][v][weight] for u, v in G.edges()])
 
-    P = np.array(list(nx.get_node_attributes(G, "P").values()))
+    # Define the weight vector K_e (from adjacency matrix weights)
+    # K = np.array([G[u][v][weight] for u, v in G.edges()])
+    if P is None:
+        P = np.array(list(nx.get_node_attributes(G, "P").values()))
+    # P = np.array(list(nx.get_node_attributes(G, "P").values()))
 
     # Define the flow variable f_e
     f = cp.Variable(num_edges)
