@@ -132,24 +132,32 @@ def random_graph(
         num_edges += 1
 
     if isinstance(alpha, str) and alpha == "random_symmetric":
+        # doesnt work atm
         np.random.seed(seed)
         alpha = np.random.uniform(0.1, 1, U.number_of_edges())
     if isinstance(beta, str) and beta == "random_symmetric":
+        # doesnt work atm
         np.random.seed(seed)
         beta = 100 * np.random.rand(U.number_of_edges())
 
+    G = U.to_directed()
+
     if isinstance(alpha, (int, float)):
-        alpha = alpha * np.ones(U.number_of_edges())
+        alpha = alpha * np.ones(G.number_of_edges())
     if isinstance(beta, (int, float)):
-        beta = beta * np.ones(U.number_of_edges())
+        beta = beta * np.ones(G.number_of_edges())
+    if isinstance(alpha, str) and alpha == "random":
+        np.random.seed(seed)
+        alpha = np.random.uniform(0.1, 1, G.number_of_edges())
+    if isinstance(beta, str) and beta == "random":
+        np.random.seed(seed)
+        beta = 100 * np.random.rand(G.number_of_edges())
 
     tt_func = {
         edge: (lambda alpha, beta: lambda n: alpha * n + beta)(alpha[e], beta[e])
-        for e, edge in enumerate(U.edges)
+        for e, edge in enumerate(G.edges)
     }
-    nx.set_edge_attributes(U, tt_func, "tt_function")
-
-    G = U.to_directed()
+    nx.set_edge_attributes(G, tt_func, "tt_function")
 
     pos = nx.spring_layout(G, seed=seed)
     nx.set_node_attributes(G, pos, "pos")
@@ -160,6 +168,53 @@ def random_graph(
     return G
 
 
+def linearTAP(G, P):
+    """
+    Calculate the linear TAP solution for a given graph G and OD matrix P.
+    ATM does not return positive flows only.
+    ATM only works for directed graphs with symmetric edges.
+    """
+    num_nodes = G.number_of_nodes()
+    tt_f = nx.get_edge_attributes(G, "tt_function")
+    alpha = np.array([tt_f[e](1) - tt_f[e](0) for e in G.edges()])
+    beta = np.array([tt_f[e](0) for e in G.edges()])
+
+    E = -nx.incidence_matrix(G, oriented=True)
+
+    kappa = 1 / alpha
+    nx.set_edge_attributes(G, dict(zip(G.edges, kappa)), "kappa")
+    L = nx.laplacian_matrix(G, weight="kappa").toarray()
+
+    alpha_dict = dict(zip(G.edges, alpha))
+    beta_dict = dict(zip(G.edges, beta))
+    Gamma = np.zeros((num_nodes, num_nodes))
+    if G.is_directed():
+        superL = L + L.T
+        np.fill_diagonal(superL, 0)
+        np.fill_diagonal(superL, -np.sum(superL, axis=0))
+        for e in G.edges:
+            i, j = e
+            a = alpha_dict[e]
+            b = beta_dict[e]
+            gamma = b / a
+            Gamma[i, j] += gamma
+            Gamma[j, i] -= gamma
+        lamb = np.linalg.pinv(superL) @ (P + Gamma @ (num_nodes * np.ones(num_nodes)))
+
+    else:
+        for e in G.edges:
+            i, j = e
+            a = alpha_dict[e]
+            b = beta_dict[e]
+            gamma = b / a
+            Gamma[i, j] += gamma
+            Gamma[j, i] -= gamma
+        lamb = np.linalg.pinv(L) @ (P + Gamma @ (num_nodes * np.ones(num_nodes)))
+
+    f_alg = ((E.T @ lamb) - (num_nodes * beta)) / alpha
+    return f_alg
+
+
 def ODmatrix(G):
     num_nodes = G.number_of_nodes()
     A = -np.ones((num_nodes, num_nodes))
@@ -168,74 +223,52 @@ def ODmatrix(G):
 
 
 # %%
-num_nodes = 7
-num_edges = int(num_nodes * 1.2)
+if __name__ == "__main__":
+    num_nodes = 20
+    num_edges = int(num_nodes * 1.2)
 
-# Example graph creation
-G = random_graph(
-    seed=42,
-    num_nodes=num_nodes,
-    num_edges=num_edges,
-    alpha="random_symmetric",
-    beta="random_symmetric",
-)
+    # Example graph creation
+    G = random_graph(
+        seed=42,
+        num_nodes=num_nodes,
+        num_edges=num_edges,
+        alpha="random",
+        beta="random",
+    )
+    # edges = list(G.edges())
+    # edges_to_remove = np.random.choice(range(len(edges)), 20, replace=False)
+    # G.remove_edges_from([edges[i] for i in edges_to_remove])
 
-# A = np.zeros((num_nodes, num_nodes))
-# A[:, 0] = -np.ones(num_nodes)
-# A[16, 0] = num_nodes - 1
-# A[15, 0] = -num_nodes + 1
+    A = ODmatrix(G)
+    B = np.zeros((num_nodes, num_nodes))
+    B[:, 0] = A[:, 0]
 
-A = ODmatrix(G)
-B = np.zeros((num_nodes, num_nodes))
-B[:, 0] = A[:, 0]
+    # xmax = np.array([10 for e in G.edges()])
+    # nx.set_edge_attributes(G, dict(zip(G.edges, xmax)), "xmax")
+    F = user_equilibrium(G, B, positive_constraint=False)
+    nx.set_edge_attributes(G, dict(zip(G.edges, F)), "flow")
+    pl.graphPlotCC(G, cc=F)
 
+    posF = user_equilibrium(G, B, positive_constraint=True)
+    nx.set_edge_attributes(G, dict(zip(G.edges, posF)), "flow")
+    pl.graphPlotCC(G, cc=posF, norm="LogNorm")
+    # f = dict(zip(G.edges, F))
+    E = -nx.incidence_matrix(G, oriented=True).toarray()
+    print(np.isclose(E @ F, B[:, 0]))
 
-# xmax = np.array([10 for e in G.edges()])
-# nx.set_edge_attributes(G, dict(zip(G.edges, xmax)), "xmax")
-F = user_equilibrium(G, B, positive_constraint=False)
-nx.set_edge_attributes(G, dict(zip(G.edges, F)), "flow")
-pl.graphPlotCC(G, cc=np.abs(F), norm="LogNorm")
+    f = linearTAP(G, B[:, 0])
+    print(np.abs(f - F) < 1e-5)
 
-posF = user_equilibrium(G, B, positive_constraint=True)
-nx.set_edge_attributes(G, dict(zip(G.edges, posF)), "flow")
-pl.graphPlotCC(G, cc=posF, norm="LogNorm")
-f = dict(zip(G.edges, F))
+    # %%
+    g = G  # .to_undirected()
 
-# %%
-tt_f = nx.get_edge_attributes(G, "tt_function")
-alpha = np.array([tt_f[e](1) - tt_f[e](0) for e in G.edges()])
-beta = np.array([tt_f[e](0) for e in G.edges()])
-P = B[:, 0]
+    P = np.zeros(g.number_of_nodes())
+    P[16], P[15] = 100, -100
+    E = -nx.incidence_matrix(g, oriented=True)
 
-E = -nx.incidence_matrix(G, oriented=True)
+    f = linearTAP(g, P)
+    pl.graphPlotCC(g, cc=f)
+    E @ f
+    np.isclose(E @ f, P)
 
-kappa = 1 / alpha
-nx.set_edge_attributes(G, dict(zip(G.edges, kappa)), "kappa")
-
-L = nx.laplacian_matrix(G, weight="kappa").toarray()
-
-lamb = np.linalg.pinv(L + L.T) @ P
-
-
-f_alg = ((E.T @ lamb) - (num_nodes * beta)) / alpha
-f_alg - F
-
-# %%
-import numpy as np
-from scipy.optimize import lsq_linear
-
-# Define the known p and L
-# Use lsq_linear to solve for x with the condition that x >= 0
-
-# bounds =
-result = lsq_linear(L, P, bounds=(10, np.inf))
-
-# The solution is stored in result.x
-x = result.x
-
-print("Solution x:")
-print(x)
-
-(E.T @ lamb - num_nodes * beta) / alpha
-
-# %%
+    # %%

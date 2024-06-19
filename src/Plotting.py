@@ -5,6 +5,7 @@ import networkx as nx
 import numpy as np
 
 from src import Equilibirium as eq
+from src import TAPOptimization as tap
 
 
 def set_size(width="default", fraction=1, subplots=(1, 1)):
@@ -162,7 +163,7 @@ def graphPlot(graph, ax=None):
     return ax
 
 
-def graphPlotCC(graph, ax=None, cc="flow", nc=None, norm="LogNorm"):
+def graphPlotCC(graph, ax=None, cc="flow", nc=None, norm="Normalize"):
     if ax is None:
         fig, ax = plt.subplots(figsize=(6, 4))
 
@@ -180,20 +181,28 @@ def graphPlotCC(graph, ax=None, cc="flow", nc=None, norm="LogNorm"):
     # elif cc
 
     vmax = max(flows.values())
-
-    vmin0 = min(flows.values())
-    vmin1 = vmax / 1000
-    vmin = max(vmin0, vmin1)
+    vmin = min(flows.values())
+    if norm == "Normalize":
+        cmap = plt.get_cmap("cividis")
+        cmap.set_under("lightgrey")
+        cmap.set_bad("lightgrey")
+        norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
 
     if norm == "LogNorm":
+        vmin1 = vmax / 1000
+        vmin = max(vmin, vmin1)
         cmap = plt.get_cmap("viridis")
         cmap.set_under("lightgrey")
         cmap.set_bad("lightgrey")
         norm = mpl.colors.LogNorm(vmin=vmin, vmax=vmax)
     elif norm == "SymLogNorm":
+        linthresh = max(1e-1, min(np.abs(list(flows.values()))))
         cmap = plt.get_cmap("coolwarm")
         norm = mpl.colors.SymLogNorm(
-            linthresh=0.03, linscale=0.03, vmin=vmin, vmax=vmax
+            linthresh=linthresh,
+            # linscale=0.1,
+            vmin=vmin,
+            vmax=vmax,
         )
 
     edge_colors = {e: cmap(norm(flows[e])) for e in graph.edges()}
@@ -248,7 +257,7 @@ def graphPlotCC(graph, ax=None, cc="flow", nc=None, norm="LogNorm"):
     )
     cbar.set_label(r"$F_{i \rightarrow j}$")
     try:
-        sc = int(round(eq.total_social_cost(graph, "flow")))
+        sc = int(tap.social_cost(graph, cc))
         ax.set_title(f"Social Cost: {sc}", fontsize=12)
     except:
         pass
