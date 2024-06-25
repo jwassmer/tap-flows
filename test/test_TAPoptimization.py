@@ -66,7 +66,7 @@ def test_linear_tap_solver(num_nodes, edge_prob, seed, setup_graph):
     B = np.zeros((num_nodes, num_nodes))
     B[:, 0] = P
     fue = tap.user_equilibrium(G, B, positive_constraint=False)
-    flin = tap.linearTAP(G, P)
+    flin, lamb = tap.linearTAP(G, P)
 
     assert np.all(
         np.abs(fue - flin) < 1e-5

@@ -198,7 +198,7 @@ def convex_optimization_kcl_tap(G, solver=cp.OSQP, verbose=False):
     constraints = [
         E @ f == P,
         f >= np.zeros(num_edges),
-        f <= xmax,
+        # f <= xmax,
     ]
 
     # Define the problem
@@ -215,7 +215,7 @@ def convex_optimization_kcl_tap(G, solver=cp.OSQP, verbose=False):
 
 
 # %%
-with open("data/cologne_full_graph.pickle", "rb") as f:
+with open("data/cologne_graph.pickle", "rb") as f:
     G = pickle.load(f)
     G = set_number_of_lanes(G)
     G = set_effective_travel_time(G)
@@ -235,7 +235,7 @@ with open("data/cologne_full_graph.pickle", "rb") as f:
 
 # %%
 
-loads = [1, 10, 20]
+loads = [1, 10, 100]
 for load in loads:
     G.total_load = load
     P = source_sink_vector(G)
@@ -271,6 +271,23 @@ for load in loads:
 
 # %%
 
+fig, ax = plt.subplots(figsize=(10, 10))
+ax.axis("off")
+edges.plot(ax=ax, column="flow", cmap=cmap, norm=norm, zorder=1)
+nodes.loc[G.source_nodes].plot(ax=ax, color="red", zorder=2)
+# nodes.loc[G.target_nodes].plot(ax=ax, color="red", zorder=2)
+cbar = plt.colorbar(
+    plt.cm.ScalarMappable(norm=norm, cmap=cmap),
+    ax=ax,
+    shrink=1 / 3,
+    extend="min",
+    pad=-0.1,
+    aspect=30,
+)
+cbar.ax.set_title(r"$F_{i \rightarrow j}$")
+fig.savefig("figs/cologne_flow.png", bbox_inches="tight", dpi=300)
+
+# %%
 
 edges[edges["flow"] > edges["xmax"]][["flow", "xmax"]]
 

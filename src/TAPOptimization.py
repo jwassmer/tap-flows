@@ -20,6 +20,14 @@ def social_cost(G, F):
     return np.sum(alpha @ F**2 + beta @ F)
 
 
+def potential_energy(G, F):
+    tt_f = nx.get_edge_attributes(G, "tt_function")
+    alpha = np.array([tt_f[e](1) - tt_f[e](0) for e in G.edges()])
+    beta = np.array([tt_f[e](0) for e in G.edges()])
+
+    return np.sum(1 / 2 * alpha @ F**2 + beta @ F)
+
+
 def social_optimum(G, A_od):
     num_nodes = G.number_of_nodes()
     num_edges = G.number_of_edges()
@@ -172,6 +180,7 @@ def linearTAP(G, P):
     """
     Calculate the linear TAP solution for a given graph G and OD matrix P.
     """
+    start_time = time.time()
     num_nodes = G.number_of_nodes()
     tt_f = nx.get_edge_attributes(G, "tt_function")
     alpha = np.array([tt_f[e](1) - tt_f[e](0) for e in G.edges()])
@@ -210,7 +219,8 @@ def linearTAP(G, P):
         lamb = np.linalg.pinv(L) @ (P + Gamma @ (num_nodes * np.ones(num_nodes)))
 
     f_alg = ((E.T @ lamb) - (num_nodes * beta)) / alpha
-    return f_alg
+    print("Time:", time.time() - start_time, "s")
+    return f_alg, lamb
 
 
 def ODmatrix(G):

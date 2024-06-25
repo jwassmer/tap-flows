@@ -163,7 +163,7 @@ def linear_program_edge_betweenness_centrality(G):
 
 
 # %%
-num_nodes = 50
+num_nodes = 20
 num_edges = int(num_nodes * 1.5)
 nodes = np.arange(num_nodes)
 source = [0]
@@ -202,6 +202,14 @@ linprog_ebc = linear_program_edge_betweenness_centrality(G)
 
 delta = np.abs(list(ebc.values()) - linprog_ebc)
 print(max(delta))
+nc = ["lightgrey" for _ in range(G.number_of_nodes())]
+
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+pl.graphPlotCC(G, cc=linprog_ebc, nc=nc, ax=ax)
+
+fig.savefig("figs/ebc.png", dpi=300)
 
 # %%
 

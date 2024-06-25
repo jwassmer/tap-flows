@@ -121,6 +121,7 @@ def graphPlot(graph, ax=None):
                 edgelist=[(u, v)],
                 connectionstyle="arc3,rad=0.1",
                 edge_color=edge_colors[(u, v)],
+                width=2,
             )
             sublabels = {(u, v): edge_labels[(u, v)]}
             nx.draw_networkx_edge_labels(
@@ -142,6 +143,7 @@ def graphPlot(graph, ax=None):
                 edgelist=[(u, v)],
                 connectionstyle="arc3,rad=0",
                 edge_color=edge_colors[(u, v)],
+                width=2,
             )
             nx.draw_networkx_edge_labels(
                 graph,
@@ -163,7 +165,9 @@ def graphPlot(graph, ax=None):
     return ax
 
 
-def graphPlotCC(graph, ax=None, cc="flow", nc=None, norm="Normalize"):
+def graphPlotCC(
+    graph, ax=None, cc="flow", nc=None, norm="Normalize", edge_labels=None, cbar=True
+):
     if ax is None:
         fig, ax = plt.subplots(figsize=(6, 4))
 
@@ -208,8 +212,19 @@ def graphPlotCC(graph, ax=None, cc="flow", nc=None, norm="Normalize"):
     edge_colors = {e: cmap(norm(flows[e])) for e in graph.edges()}
     if nc is None:
         node_colors = nx.get_node_attributes(graph, "color")
-    elif isinstance(nc, str):
-        node_colors = dict(zip(graph.nodes(), [nc] * graph.number_of_nodes()))
+    elif not isinstance(nc, dict):
+        if isinstance(nc, str):
+            node_colors = nx.get_node_attributes(graph, nc)
+        elif isinstance(nc, list) or isinstance(nc, np.ndarray):
+            node_colors = dict(zip(graph.nodes(), nc))
+
+        cmap = plt.get_cmap("viridis")
+        norm = mpl.colors.Normalize(
+            vmin=min(node_colors.values()), vmax=max(node_colors.values())
+        )
+        node_colors = {n: cmap(norm(node_colors[n])) for n in graph.nodes()}
+    else:
+        node_colors = nc
 
     if len(node_colors) == 0:
         node_colors = {n: "lightgrey" for n in graph.nodes()}
@@ -219,13 +234,13 @@ def graphPlotCC(graph, ax=None, cc="flow", nc=None, norm="Normalize"):
             graph,
             pos,
             ax=ax,
-            node_color=node_colors.values(),
+            node_color=list(node_colors.values()),
         )
         nx.draw_networkx_labels(graph, pos, ax=ax)
     else:
         nx.draw_networkx_nodes(graph, pos, ax=ax, node_color="lightgrey", node_size=0)
     for u, v in graph.edges():
-        if (v, u) in graph.edges():
+        if (v, u) in graph.edges() and nx.is_directed(graph):
             # Draw with curvature if bidirectional
             nx.draw_networkx_edges(
                 graph,
@@ -234,7 +249,18 @@ def graphPlotCC(graph, ax=None, cc="flow", nc=None, norm="Normalize"):
                 edgelist=[(u, v)],
                 connectionstyle="arc3,rad=0.1",
                 edge_color=edge_colors[(u, v)],
+                width=2,
             )
+            if edge_labels is not None:
+                sublabels = {(u, v): np.round(edge_labels[(u, v)], 1)}
+                nx.draw_networkx_edge_labels(
+                    graph,
+                    pos,
+                    ax=ax,
+                    edge_labels=sublabels,
+                    connectionstyle="arc3,rad=0.2",
+                    font_size=12,
+                )
 
         else:
             # Draw straight lines if not bidirectional
@@ -243,22 +269,37 @@ def graphPlotCC(graph, ax=None, cc="flow", nc=None, norm="Normalize"):
                 pos,
                 ax=ax,
                 edgelist=[(u, v)],
-                connectionstyle="arc3,rad=0",
+                connectionstyle="arc3,rad=0.2",
                 edge_color=edge_colors[(u, v)],
+                width=2,
             )
-
-    cbar = plt.colorbar(
-        mpl.cm.ScalarMappable(norm=norm, cmap=cmap),
-        ax=ax,
-        pad=0.0,
-        aspect=20,
-        shrink=1 / 2,
-        extend="min",
-    )
-    cbar.set_label(r"$F_{i \rightarrow j}$")
+            if edge_labels is not None:
+                sublabels = {(u, v): np.round(edge_labels[(u, v)], 1)}
+                nx.draw_networkx_edge_labels(
+                    graph,
+                    pos,
+                    ax=ax,
+                    edge_labels=sublabels,
+                    connectionstyle="arc3,rad=0.2",
+                    font_size=12,
+                )
+    if cbar:
+        cbar = plt.colorbar(
+            mpl.cm.ScalarMappable(norm=norm, cmap=cmap),
+            ax=ax,
+            pad=0.0,
+            aspect=20,
+            shrink=1 / 2,
+            extend="min",
+        )
+        cbar.ax.set_title(r"$F_{i \rightarrow j}$")
     try:
-        sc = int(tap.social_cost(graph, cc))
-        ax.set_title(f"Social Cost: {sc}", fontsize=12)
+        sc = int(tap.social_cost(graph, np.array(list(flows.values()))))
+        ax.set_title(rf"$\sum_{{e\in E}} C(f_e)=${sc}", fontsize=12)
+        pe = int(tap.potential_energy(graph, np.array(list(flows.values()))))
+        ax.set_title(
+            ax.get_title() + "\n" + rf"$\sum_{{e\in E}} U(f_e)=${pe}", fontsize=12
+        )
     except:
         pass
 
@@ -271,7 +312,7 @@ def graphPlotCC(graph, ax=None, cc="flow", nc=None, norm="Normalize"):
 if __name__ == "__main__":
     from src import Equilibirium as eq
 
-    g = nx.erdos_renyi_graph(10, 0.7)
+    g = nx.erdos_renyi_graph(10, 0.3, directed=True, seed=42)
     pos = nx.spring_layout(g)
     nx.set_node_attributes(g, pos, "pos")
     nx.set_edge_attributes(g, 1, "weight")
@@ -281,8 +322,11 @@ if __name__ == "__main__":
     nx.set_node_attributes(g, dict(zip(g.nodes, P)), "P")
 
     F = eq.linear_flow(g)
-    nx.set_edge_attributes(g, F, "flow")
-    graphPlotCC(g)
+    Fvec = np.array(list(F.values()))
+    graphPlotCC(g, cc=Fvec, edge_labels=F)
+
+
+mpl_params(fontsize=14)
 
 # %%
 

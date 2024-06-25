@@ -8,8 +8,6 @@ from src import ConvexOptimization as co
 from src import Plotting as pl
 from src import Equilibirium as eq
 
-# %%
-
 
 def social_cost(G, kwd="flow"):
     tt_funcs = nx.get_edge_attributes(G, "tt_function")
@@ -29,21 +27,26 @@ def convex_optimization_fulltap(G, A_od):
     alpha_e = np.array([tt_func[e](1) - tt_func[e](0) for e in G.edges()])
 
     # Define the variable F
-    fe = cp.Variable((num_edges, num_nodes))
+    fe = cp.Variable((num_nodes, num_edges))
 
     # Define the objective function
-    objective = cp.Minimize(cp.sum(1 / 2 * alpha_e @ fe**2 + beta_e @ fe))
+    objective = cp.Minimize(
+        cp.sum(1 / 2 * fe**2 @ alpha_e + fe @ beta_e)
+    )  # + cp.sum(fe))
     # objective = cp.Minimize(cp.sum(cp.multiply(cp.sum(fe, axis=1), alpha_e) + beta_e))
 
     # Define the constraints
     if len(maxx) == 0:
-        # maxx = np.array([np.inf for e in G.edges()])
-        constraints = [E @ fe == A_od]  # , fe >= np.zeros((num_edges, num_nodes))]
+        # print(E.toarray())
+        constraints = [fe >= np.zeros((num_nodes, num_edges))]
+        for n in G.nodes():
+            # print(n, A_od[:, n])
+            constraints.append(E @ fe[n, :] == A_od[:, n])
     else:
         constraints = [
-            E @ fe == A_od,
-            fe >= np.zeros((num_edges, num_nodes)),
-            cp.sum(fe, axis=1) <= maxx,
+            E @ fe.T == A_od,
+            fe >= np.zeros((num_nodes, num_edges)),
+            cp.sum(fe, axis=0) <= maxx,
         ]
 
     # Define the problem
@@ -56,7 +59,7 @@ def convex_optimization_fulltap(G, A_od):
     # ebc_linprog = np.sum(fe.value, axis=1)
     linprog_time = time.time() - start_time
     print("Time:", linprog_time, "s")
-    # return fe.value
+    return np.round(fe.value.T, 2)
     return np.sum(fe.value, axis=1)
 
 
@@ -113,62 +116,51 @@ def ODmatrix(G):
 
 
 # %%
-num_nodes = 20
-num_edges = int(num_nodes * 1.5)
+num_nodes = 3
+num_edges = 2  # int(num_nodes * 1.5)
 nodes = np.arange(num_nodes)
 source = [0]
 targets = np.delete(nodes, source[0])
-total_load = len(targets)
+total_load = 1000
 # Example graph creation
 G = random_graph(
     seed=42,
     num_nodes=num_nodes,
     num_edges=num_edges,
-    alpha=3,
+    alpha=1,
     beta=3,
 )
-
-# A = ODmatrix(G)
-A = np.zeros((num_nodes, num_nodes))
-# A[:, 0] = -np.ones(num_nodes)
-A[0, 0] = 100
-A[-1, 0] = -100
-
-# xmax = np.array([10 for e in G.edges()])
-# nx.set_edge_attributes(G, dict(zip(G.edges, xmax)), "xmax")
-F = convex_optimization_fulltap(G, A)
-nx.set_edge_attributes(G, dict(zip(G.edges, F)), "flow")
-
-pl.graphPlotCC(G, cc=np.abs(F))
-f = dict(zip(G.edges, F))
-f
-
-# %%
-tt_f = nx.get_edge_attributes(G, "tt_function")
-alpha = np.array([tt_f[e](1) - tt_f[e](0) for e in G.edges()])
-beta = np.array([tt_f[e](0) for e in G.edges()])
-P = A[:, 0]
-
+rem_edges = [(1, 0), (0, 2)]
+G.remove_edges_from(rem_edges)
+G.add_edge(2, 1, tt_function=lambda x: 1 * x + 6)
 E = -nx.incidence_matrix(G, oriented=True)
-
-kappa = 1 / alpha
-nx.set_edge_attributes(G, dict(zip(G.edges, kappa)), "kappa")
-
-L = nx.laplacian_matrix(G, weight="kappa").toarray()
-
-lamb = np.linalg.pinv(L + L.T) @ P
+# Einv = np.linalg.pinv(E.toarray())
+A = ODmatrix(G)
 
 
-f_alg = (E.T @ lamb - num_nodes * beta) / alpha
-f_alg - F
+for n in [1, 0]:
+    A = np.zeros((num_nodes, num_nodes))
+    A[2, 0] += total_load
+    A[1, 0] += -total_load
+    A[2, n] += total_load
+    A[0, n] += -total_load
+    print(A)
+
+    F_nm = convex_optimization_fulltap(G, A)
+    F = F_nm.sum(axis=1)
+    nx.set_edge_attributes(G, dict(zip(G.edges, F)), "flow")
+
+    pl.graphPlotCC(G, cc=F, edge_labels=dict(zip(G.edges, F)))
+    # print("F_nm=", F_nm)
+    E @ F_nm
+
 # %%
 
-E @ (f_alg - min(f_alg))
-# %%
-nx.laplacian_matrix(G, weight="kappa").toarray()
+# G.add_edge(1, 2, tt_function=lambda x: 1 * x + 6)
+G.source_nodes = [2]
+G.target_nodes = [0, 1]
+G.total_load = 2000
 
-# %%
-
-
-L.T
+f = co.convex_optimization_TAP(G)
+pl.graphPlotCC(G, cc=f, edge_labels=dict(zip(G.edges, f)))
 # %%

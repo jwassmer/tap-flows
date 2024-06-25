@@ -79,16 +79,27 @@ def od_path_incidence_matrix(G):
     return od_path_incidence_matrix
 
 
-def cycle_link_incidence_matrix(G):
+def cycle_basis(G):
     if nx.is_directed(G):
         U = G.to_undirected()
+        cycle_basis = nx.minimum_cycle_basis(U)
+        extra_cycles = []
+        for u, v in U.edges():
+            if G.has_edge(v, u) and G.has_edge(u, v):
+                extra_cycles.append([u, v])
+        cycle_basis.extend(extra_cycles)
     else:
         U = G
-    cycle_basis = nx.minimum_cycle_basis(U)
+        cycle_basis = nx.minimum_cycle_basis(U)
+    return cycle_basis
+
+
+def cycle_link_incidence_matrix(G):
+    cbase = cycle_basis(G)
     links = G.edges()
 
-    cycle_edge_incidence_matrix = np.zeros((len(cycle_basis), len(links)))
-    for i, cycle in enumerate(cycle_basis):
+    cycle_edge_incidence_matrix = np.zeros((len(cbase), len(links)))
+    for i, cycle in enumerate(cbase):
         cycle = tuple(cycle + [cycle[0]])
         for j, link in enumerate(links):
             if is_subsequence(link, cycle):
@@ -106,7 +117,7 @@ if __name__ == "__main__":
     from src import GraphGenerator as gg
     from src import Plotting as pl
 
-    source_node, target_node = ["a", "b"], ["c", "j"]
+    source_node, target_node = ["c", "d"], ["h"]
     total_load = 1000
 
     U = gg.random_graph(
