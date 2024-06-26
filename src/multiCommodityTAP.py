@@ -23,8 +23,16 @@ def price_of_anarchy(G, demands):
     Fue_dict = dict(zip(G.edges, Fue))
 
     cost_funcs = nx.get_edge_attributes(G, "tt_function")
-    so_cost = sum([Fso_dict[e] * cost_funcs[e](Fso_dict[e]) for e in G.edges()])
-    ue_cost = sum([Fue_dict[e] * cost_funcs[e](Fue_dict[e]) for e in G.edges()])
+    if isinstance(G, nx.MultiDiGraph):
+        so_cost = sum(
+            [Fso_dict[e] * cost_funcs[e](Fso_dict[e]) for e in G.edges(keys=True)]
+        )
+        ue_cost = sum(
+            [Fue_dict[e] * cost_funcs[e](Fue_dict[e]) for e in G.edges(keys=True)]
+        )
+    else:
+        so_cost = sum([Fso_dict[e] * cost_funcs[e](Fso_dict[e]) for e in G.edges()])
+        ue_cost = sum([Fue_dict[e] * cost_funcs[e](Fue_dict[e]) for e in G.edges()])
     # print(so_cost, ue_cost)
     return ue_cost - so_cost
 
@@ -42,8 +50,12 @@ def solve_multicommodity_tap(G, demands, social_optimum=False):
     A = -nx.incidence_matrix(G, oriented=True).toarray()
 
     tt_funcs = nx.get_edge_attributes(G, "tt_function")
-    beta = np.array([tt_funcs[e](0) for e in G.edges()])
-    alpha = np.array([tt_funcs[e](1) - tt_funcs[e](0) for e in G.edges()])
+    if isinstance(G, nx.MultiDiGraph):
+        beta = np.array([tt_funcs[e](0) for e in G.edges(keys=True)])
+        alpha = np.array([tt_funcs[e](1) - tt_funcs[e](0) for e in G.edges(keys=True)])
+    else:
+        beta = np.array([tt_funcs[e](0) for e in G.edges()])
+        alpha = np.array([tt_funcs[e](1) - tt_funcs[e](0) for e in G.edges()])
 
     # Number of edges
     num_edges = G.number_of_edges()
@@ -67,18 +79,17 @@ def solve_multicommodity_tap(G, demands, social_optimum=False):
     # Objective function
     total_flow = cp.sum(flows)
     objective = cp.Minimize(
-        Q * cp.sum(cp.multiply(alpha, total_flow**2))
-        + cp.sum(cp.multiply(beta, total_flow))
+        cp.sum((cp.multiply(Q * alpha, total_flow**2)) + cp.multiply(beta, total_flow))
     )
 
     # Define the problem and solve it
     prob = cp.Problem(objective, constraints)
-    prob.solve()
+    prob.solve(eps_rel=1e-7)
 
     # Extract the flows for each commodity
     # flows_value = [f.value for f in flows]
     conv_time = time.time() - start_time
-    print("Time:", conv_time, "s")
+    # print("Time:", conv_time, "s")
 
     return total_flow.value
 

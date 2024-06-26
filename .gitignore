@@ -2,9 +2,13 @@
 
  *.pdf
  *.png
+ *.tif
 
 #folders
+cache
 src/__pycache__
 test/__pycache__
+data/GHS
+
 
 __pycache__

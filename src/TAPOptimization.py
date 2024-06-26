@@ -28,7 +28,7 @@ def potential_energy(G, F):
     return np.sum(1 / 2 * alpha @ F**2 + beta @ F)
 
 
-def social_optimum(G, A_od):
+def social_optimum(G, P):
     num_nodes = G.number_of_nodes()
     num_edges = G.number_of_edges()
 
@@ -42,38 +42,41 @@ def social_optimum(G, A_od):
     alpha_e = np.array([tt_func[e](1) - tt_func[e](0) for e in G.edges()])
 
     # Define the variable F
-    fe = cp.Variable((num_edges, num_nodes))
+    fe = cp.Variable(num_edges)
 
     # Define the objective function
     objective = cp.Minimize(cp.sum(alpha_e @ fe**2 + beta_e @ fe))
 
     # Define the constraints
     if len(maxx) == 0:
-        constraints = [E @ fe == A_od]
+        constraints = [E @ fe == P]
     else:
         constraints = [
-            E @ fe == A_od,
+            E @ fe == P,
             cp.sum(fe, axis=1) <= maxx,
         ]
 
-    constraints.append(fe >= np.zeros((num_edges, num_nodes)))
+    constraints.append(fe >= np.zeros(num_edges))
 
     # Define the problem
     problem = cp.Problem(objective, constraints)
 
     start_time = time.time()
     # Solve the problem
-    problem.solve(verbose=False)
-    # print("Optimal value:", problem.value)
+    problem.solve(
+        verbose=False, solver=cp.OSQP, eps_rel=1e-7
+    )  # print("Optimal value:", problem.value)
 
     # ebc_linprog = np.sum(fe.value, axis=1)
     linprog_time = time.time() - start_time
     print("Time:", linprog_time, "s")
-    F = np.sum(fe.value, axis=1)
-    return F
+    print("Social cost:", social_cost(G, fe.value))
+    print("Potential energy:", potential_energy(G, fe.value))
+    print("Minimum:", problem.value)
+    return fe.value
 
 
-def user_equilibrium(G, A_od, positive_constraint=True):
+def user_equilibrium(G, P, positive_constraint=True):
     num_nodes = G.number_of_nodes()
     num_edges = G.number_of_edges()
 
@@ -87,7 +90,7 @@ def user_equilibrium(G, A_od, positive_constraint=True):
     alpha_e = np.array([tt_func[e](1) - tt_func[e](0) for e in G.edges()])
 
     # Define the variable F
-    fe = cp.Variable((num_edges, num_nodes))
+    fe = cp.Variable(num_edges)
 
     # Define the objective function
     objective = cp.Minimize(cp.sum(1 / 2 * alpha_e @ fe**2 + beta_e @ fe))
@@ -96,30 +99,32 @@ def user_equilibrium(G, A_od, positive_constraint=True):
     # Define the constraints
     if len(maxx) == 0:
         # maxx = np.array([np.inf for e in G.edges()])
-        constraints = [E @ fe == A_od]
+        constraints = [E @ fe == P]
     else:
         constraints = [
-            E @ fe == A_od,
+            E @ fe == P,
             # fe >= np.zeros((num_edges, num_nodes)),
             cp.sum(fe, axis=1) <= maxx,
         ]
 
     if positive_constraint:
-        constraints.append(fe >= np.zeros((num_edges, num_nodes)))
+        constraints.append(fe >= np.zeros(num_edges))
 
     # Define the problem
     problem = cp.Problem(objective, constraints)
 
     start_time = time.time()
     # Solve the problem
-    problem.solve(verbose=False)
+    problem.solve(verbose=False, solver=cp.OSQP, eps_rel=1e-7)
     # print("Optimal value:", problem.value)
 
     # ebc_linprog = np.sum(fe.value, axis=1)
     linprog_time = time.time() - start_time
+    F = fe.value
     print("Time:", linprog_time, "s")
-    F = np.sum(fe.value, axis=1)
     print("Social cost:", social_cost(G, F))
+    print("Potential energy:", potential_energy(G, F))
+    print("Minimum:", problem.value)
     return F
 
 
