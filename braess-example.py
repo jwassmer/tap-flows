@@ -62,8 +62,8 @@ def build_graph(start_node, end_node, total_load):
     G.add_edges_from(
         [
             (a, b, {"tt_function": lambda n: n / 100 + 10}),
-            (b, d, {"tt_function": lambda n: 20}),
-            (a, c, {"tt_function": lambda n: 20}),
+            (b, d, {"tt_function": lambda n: 25}),
+            (a, c, {"tt_function": lambda n: 25}),
             (c, d, {"tt_function": lambda n: n / 100 + 10}),
             (b, c, {"tt_function": lambda n: 0}),
         ]
@@ -100,7 +100,7 @@ def build_graph(start_node, end_node, total_load):
 # %%
 
 start_node, end_node = "a", "d"
-total_load = 1000
+total_load = 500
 G = build_graph(start_node, end_node, total_load)
 
 tapflow = co.convex_optimization_kcl_tap(G)
@@ -124,13 +124,24 @@ for beta in betas:
     scs.append(social_cost)
     energies.append(energy)
 
+G.remove_edges_from([("b", "c")])
+tapflow = co.convex_optimization_kcl_tap(G)
+nx.set_edge_attributes(G, dict(zip(G.edges, tapflow)), "tapflow")
+social_cost = eq.total_social_cost(G, kwd="tapflow") / G.total_load
+energy = eq.total_potential_energy(G, kwd="tapflow") / G.total_load
+G.add_edge("b", "c", tt_function=lambda n: beta)
+
 
 fig, ax = plt.subplots(figsize=(6, 4))
 ax.plot(betas, scs, label="Social Cost")
 ax.plot(betas, energies, label="Potential Energy")
+plt.scatter(beta, [social_cost], color="red", label="Removed")
+plt.scatter(beta, [energy], color="red")
 ax.legend()
 ax.grid()
 ax.set_xlabel("Beta")
+
+
 # %%
 
 import cvxpy as cp

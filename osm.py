@@ -7,8 +7,9 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from scipy.integrate import quad
 import cvxpy as cp
+import time
 
-
+from src import multiCommodityTAP as mc
 from src import Plotting as pl
 
 
@@ -173,45 +174,60 @@ def set_effective_travel_time(G, gamma=1):
     return G
 
 
-def convex_optimization_kcl_tap(G, solver=cp.OSQP, verbose=False):
-    # Get the number of edges and nodes
-    num_edges = G.number_of_edges()
+def solve_multicommodity_tap(G, demands):
+    """
+    Solves the multicommodity flow problem using CVXPY for a given graph,
+    demands, and linear cost function parameters alpha and beta.
 
-    # Create the edge incidence matrix E
-    E = -nx.incidence_matrix(G, oriented=True).toarray()
+    Parameters:
+        G: nx.DiGraph - the graph
+        demands: list - the demands for each commodity
+    """
+    start_time = time.time()
+    A = -nx.incidence_matrix(G, oriented=True).toarray()
 
     tt_funcs = nx.get_edge_attributes(G, "tt_function")
-    betas = np.array([tt_funcs[e](0) for e in G.edges(keys=True)])
-    alphas = np.array([tt_funcs[e](1) - tt_funcs[e](0) for e in G.edges(keys=True)])
+    beta = np.array([tt_funcs[e](0) for e in G.edges(keys=True)])
+    alpha = np.array([tt_funcs[e](1) - tt_funcs[e](0) for e in G.edges(keys=True)])
 
-    P = np.array(list(nx.get_node_attributes(G, "P").values()))
+    # Number of edges
+    num_edges = G.number_of_edges()
 
-    # Define the flow variable f_e
-    f = cp.Variable(num_edges)
+    # Number of commodities
+    num_commodities = len(demands)
 
-    objective = cp.Minimize(cp.sum(alphas @ f**2 / 2 + betas @ f))
+    # Variables for the flow on each edge for each commodity
+    flows = [cp.Variable(num_edges, nonneg=True) for _ in range(num_commodities)]
+    # flows = cp.Variable((num_commodities, num_edges))  # , nonneg=True)
+    # Combine the constraints for flow conservation
+    constraints = []
+    for k in range(num_commodities):
+        constraints.append(A @ flows[k] == demands[k])
 
-    # Constraints: E @ f = p
-    xmax = np.array(list(nx.get_edge_attributes(G, "xmax").values()))
-    # tmax = 100000 * np.ones(num_edges)
+    # Objective function
+    total_flow = cp.sum(flows)
+    objective = cp.Minimize(
+        cp.sum(cp.multiply(alpha, total_flow**2))
+        + cp.sum(cp.multiply(beta, total_flow))
+    )
 
-    constraints = [
-        E @ f == P,
-        f >= np.zeros(num_edges),
-        # f <= xmax,
-    ]
+    # Define the problem and solve it
+    prob = cp.Problem(objective, constraints)
+    prob.solve()
 
-    # Define the problem
-    problem = cp.Problem(objective, constraints)
+    # Extract the flows for each commodity
+    # flows_value = [f.value for f in flows]
+    conv_time = time.time() - start_time
+    print("Time:", conv_time, "s")
 
-    # Solve the problem
-    problem.solve(solver=solver, verbose=verbose)
+    return total_flow.value
 
-    # Get the results
-    flow_values = f.value
 
-    flow_values, problem.value
-    return flow_values, problem.value
+def OD_matrix(G):
+    num_nodes = G.number_of_nodes()
+    A = -np.ones((num_nodes, num_nodes))
+    np.fill_diagonal(A, num_nodes - 1)
+    return A
 
 
 # %%
@@ -224,49 +240,40 @@ with open("data/cologne_graph.pickle", "rb") as f:
     gcc_nodes = max(nx.strongly_connected_components(G), key=len)
     G = G.subgraph(gcc_nodes)  # .copy()
 
-    nodes = list(G.nodes)
-    source_idx = 1500
-    sources = [nodes[source_idx]]
-    targets = np.delete(nodes, source_idx)
+    A = OD_matrix(G)
 
-    G.source_nodes = sources
-    G.target_nodes = targets
+    demands = [a for a in A]
+    # F = solve_multicommodity_tap(G, demands)
 
 
 # %%
 
-loads = [1, 10, 100]
-for load in loads:
-    G.total_load = load
-    P = source_sink_vector(G)
-    Pdict = dict(zip(G.nodes(), P))
-    nx.set_node_attributes(G, Pdict, "P")
 
-    F = convex_optimization_kcl_tap(G)[0]
-    vmin = 1e-1
+F = solve_multicommodity_tap(G, demands)
+vmin = 1e-1
 
-    nodes, edges = ox.graph_to_gdfs(G)
-    edges["flow"] = F
-    nx.set_edge_attributes(G, edges["flow"], "flow")
-    edges = edges.sort_values(by="flow", ascending=True)
+nodes, edges = ox.graph_to_gdfs(G)
+edges["flow"] = F
+nx.set_edge_attributes(G, edges["flow"], "flow")
+edges = edges.sort_values(by="flow", ascending=True)
 
-    util = edges["flow"] / edges["xmax"]
-    edges["util"] = util
-    # edges = edges.sort_values(by="util", ascending=True)
+util = edges["flow"] / edges["xmax"]
+edges["util"] = util
+# edges = edges.sort_values(by="util", ascending=True)
 
-    cmap = mpl.colormaps.get_cmap("cividis")
-    cmap.set_under("lightgrey")
-    norm = mpl.colors.LogNorm(vmin=vmin, vmax=F.max())
+cmap = mpl.colormaps.get_cmap("cividis")
+cmap.set_under("lightgrey")
+norm = mpl.colors.LogNorm(vmin=vmin, vmax=F.max())
 
-    fig, ax = plt.subplots(figsize=(10, 10))
-    edges.plot(ax=ax, column="flow", cmap=cmap, norm=norm, zorder=1)
-    nodes.loc[G.source_nodes].plot(ax=ax, color="red", zorder=2)
-    # nodes.loc[G.target_nodes].plot(ax=ax, color="red", zorder=2)
-    cbar = plt.colorbar(
-        plt.cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, shrink=0.5, extend="min"
-    )
-    print("Social Cost:", total_social_cost(G) / edges.flow.sum())
-    # print(edges.flow.sum())
+fig, ax = plt.subplots(figsize=(10, 10))
+edges.plot(ax=ax, column="flow", cmap=cmap, norm=norm, zorder=1)
+nodes.loc[G.source_nodes].plot(ax=ax, color="red", zorder=2)
+# nodes.loc[G.target_nodes].plot(ax=ax, color="red", zorder=2)
+cbar = plt.colorbar(
+    plt.cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, shrink=0.5, extend="min"
+)
+print("Social Cost:", total_social_cost(G) / edges.flow.sum())
+# print(edges.flow.sum())
 
 
 # %%
@@ -274,7 +281,7 @@ for load in loads:
 fig, ax = plt.subplots(figsize=(10, 10))
 ax.axis("off")
 edges.plot(ax=ax, column="flow", cmap=cmap, norm=norm, zorder=1)
-nodes.loc[G.source_nodes].plot(ax=ax, color="red", zorder=2)
+# nodes.loc[G.source_nodes].plot(ax=ax, color="red", zorder=2)
 # nodes.loc[G.target_nodes].plot(ax=ax, color="red", zorder=2)
 cbar = plt.colorbar(
     plt.cm.ScalarMappable(norm=norm, cmap=cmap),

@@ -4,8 +4,32 @@ import cvxpy as cp
 import time
 import networkx as nx
 
+from src import ConvexOptimization as co
+from src import Plotting as pl
 
-def solve_multicommodity_tap(G, demands):
+
+def price_of_anarchy(G, demands):
+    """
+    Compute the price of anarchy for a given graph and demands.
+
+    Parameters:
+        G: nx.DiGraph - the graph
+        demands: list - the demands for each commodity
+    """
+    Fso = solve_multicommodity_tap(G, demands, social_optimum=True)
+    Fue = solve_multicommodity_tap(G, demands, social_optimum=False)
+
+    Fso_dict = dict(zip(G.edges, Fso))
+    Fue_dict = dict(zip(G.edges, Fue))
+
+    cost_funcs = nx.get_edge_attributes(G, "tt_function")
+    so_cost = sum([Fso_dict[e] * cost_funcs[e](Fso_dict[e]) for e in G.edges()])
+    ue_cost = sum([Fue_dict[e] * cost_funcs[e](Fue_dict[e]) for e in G.edges()])
+    # print(so_cost, ue_cost)
+    return ue_cost - so_cost
+
+
+def solve_multicommodity_tap(G, demands, social_optimum=False):
     """
     Solves the multicommodity flow problem using CVXPY for a given graph,
     demands, and linear cost function parameters alpha and beta.
@@ -35,10 +59,15 @@ def solve_multicommodity_tap(G, demands):
     for k in range(num_commodities):
         constraints.append(A @ flows[k] == demands[k])
 
+    if social_optimum:
+        Q = 1
+    elif not social_optimum:
+        Q = 1 / 2
+
     # Objective function
     total_flow = cp.sum(flows)
     objective = cp.Minimize(
-        cp.sum(cp.multiply(alpha, total_flow**2))
+        Q * cp.sum(cp.multiply(alpha, total_flow**2))
         + cp.sum(cp.multiply(beta, total_flow))
     )
 
@@ -102,7 +131,7 @@ def random_graph(
 # %%
 if __name__ == "__main__":
 
-    num_nodes = 1000
+    num_nodes = 50
     num_edges = int(num_nodes * 1.5)
     # Example graph creation
     G = random_graph(
@@ -114,16 +143,35 @@ if __name__ == "__main__":
     )
     load = 1000
     P0 = np.zeros(num_nodes)
-    P0[2], P0[7] = load, -load
+    P0[13], P0[14] = load, -load
     P1 = np.zeros(num_nodes)
-    P1[5], P1[2] = load, -load
+    # P1[10], P1[7] = load, -load
 
     demands = [P0, P1]
-    # demands = [P0 + P1]
-    F = solve_multicommodity_tap(G, demands)
-    # pl.graphPlotCC(G, cc=F)  # , edge_labels=dict(zip(G.edges, F)))
+    Fso = solve_multicommodity_tap(G, demands, social_optimum=True)
+    Fue = solve_multicommodity_tap(G, demands, social_optimum=False)
+    pl.graphPlotCC(G, cc=Fue)  # , edge_labels=dict(zip(G.edges, Fue)))
+    print(price_of_anarchy(G, demands))
+    # %%
 
+    P = P0 + P1
+    nx.set_node_attributes(G, dict(zip(G.nodes, P)), "P")
+    Fco = co.convex_optimization_kcl_tap(G)
+    pl.graphPlotCC(G, cc=Fco)  # , edge_labels=dict(zip(G.edges, Fco)))
+    print(np.round(Fue - Fco, 5))
     # WRITE TEST
 
+    # %%
+    def OD_matrix(G):
+        num_nodes = G.number_of_nodes()
+        A = -np.ones((num_nodes, num_nodes))
+        np.fill_diagonal(A, num_nodes - 1)
+        return A
 
-# %%
+    A = OD_matrix(G)
+    demands = [A[:, i] for i in range(num_nodes)]
+    Fue = solve_multicommodity_tap(G, demands)
+    Fso = solve_multicommodity_tap(G, demands, social_optimum=True)
+
+    print(price_of_anarchy(G, demands))
+    # %%
