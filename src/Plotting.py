@@ -309,24 +309,26 @@ def graphPlotCC(
 
 
 # %%
-if __name__ == "__main__":
-    from src import Equilibirium as eq
+from sys import platform
 
-    g = nx.erdos_renyi_graph(10, 0.3, directed=True, seed=42)
-    pos = nx.spring_layout(g)
-    nx.set_node_attributes(g, pos, "pos")
-    nx.set_edge_attributes(g, 1, "weight")
-    P = np.zeros(g.number_of_nodes())
-    P[0] = 1
-    P[-1] = -1
-    nx.set_node_attributes(g, dict(zip(g.nodes, P)), "P")
+if platform != "linux":
+    if __name__ == "__main__":
+        from src import Equilibirium as eq
 
-    F = eq.linear_flow(g)
-    Fvec = np.array(list(F.values()))
-    graphPlotCC(g, cc=Fvec, edge_labels=F)
+        g = nx.erdos_renyi_graph(10, 0.3, directed=True, seed=42)
+        pos = nx.spring_layout(g)
+        nx.set_node_attributes(g, pos, "pos")
+        nx.set_edge_attributes(g, 1, "weight")
+        P = np.zeros(g.number_of_nodes())
+        P[0] = 1
+        P[-1] = -1
+        nx.set_node_attributes(g, dict(zip(g.nodes, P)), "P")
 
+        F = eq.linear_flow(g)
+        Fvec = np.array(list(F.values()))
+        graphPlotCC(g, cc=Fvec, edge_labels=F)
 
-mpl_params(fontsize=14)
+    mpl_params(fontsize=14)
 
 # %%
 
