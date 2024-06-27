@@ -34,9 +34,9 @@ fue = tap.user_equilibrium(G, P)
 print("Social Optimum:")
 fso = tap.social_optimum(G, P)
 # %%
-np.round(Fue - fue, 3)
+np.round(Fue - fue, 5)
 # %%
-np.round(Fso - fso, 3)
+np.round(Fso - fso, 5)
 # %%
 tap.social_cost(G, Fue) - tap.social_cost(G, Fso)
 # %%

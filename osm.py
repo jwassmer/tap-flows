@@ -61,59 +61,54 @@ def total_potential_energy(G):
     )
 
 
-def demand_list(G, commodity="Index"):
+def demand_list(G, commodity, gamma=0.1):
     nodes, edges = ox.graph_to_gdfs(G)
+    nodes["source_node"] = False
+
     demands = []
     tot_pop = 0
-    if commodity == "Index":
-        commodities = nodes.index
-        nodes[commodity] = commodities
-    else:
-        commodities = nodes[commodity].unique()
-    for c in commodities:
-        pop_com = nodes[nodes[commodity] == c]["population"].sum()
-        com_nodes = list(nodes[nodes[commodity] == c].index)
-        target_nodes = list(nodes[nodes[commodity] != c].index)
+    for idx, row in commodity.iterrows():
+        pop_com = row["population"]
+        vor_geom = row["voronoi"]
+        source_node = idx
+        target_nodes = nodes[~nodes["geometry"].within(vor_geom)].index
 
-        random_com_node = np.random.choice(com_nodes)
+        # random_com_node = np.random.choice(com_nodes)
+        nodes.loc[source_node, "source_node"] = True
 
         P = dict(zip(G.nodes(), np.zeros(G.number_of_nodes())))
-        for node in com_nodes:
-            P[node] = pop_com / len(com_nodes)
+        # for node in com_nodes:
+        P[source_node] = pop_com * gamma  # / len(com_nodes)
         # P[random_com_node] = pop_com
         for node in target_nodes:
-            P[node] = -pop_com / len(target_nodes)
+            P[node] = -pop_com * gamma / len(target_nodes)
         # print(sum(P.values()))
 
         demands.append(list(P.values()))
         # print(c, pop_com)
         tot_pop += pop_com
-    return demands
+    # print("Total Population:", tot_pop)
+    return demands, nodes
 
 
 # %%
 G, districts = og.osmGraph("Potsdam,Germany", return_districts=True)
+selected_nodes = og.select_evenly_distributed_nodes(G, 30)
 
 # %%
-demands = demand_list(
+demands, nodes = demand_list(
     G,
-    commodity="Index",
+    commodity=selected_nodes,
 )
-len(demands)
 
 # %%
-poa = mc.price_of_anarchy(G, demands)
-print(poa)
-# F = mc.solve_multicommodity_tap(G, demands, social_optimum=False)
-# F
-
+F = mc.solve_multicommodity_tap(
+    G, demands, social_optimum=False, verbose=True, max_iter=50_000
+)
 # %%
+vmin = 1e2
 
-F = mc.solve_multicommodity_tap(G, demands, social_optimum=False)
-# %%
-vmin = 1e3
-
-nodes, edges = ox.graph_to_gdfs(G)
+edges = ox.graph_to_gdfs(G, nodes=False, edges=True)
 edges["flow"] = F
 nx.set_edge_attributes(G, edges["flow"], "flow")
 edges = edges.sort_values(by="flow", ascending=True)
@@ -129,6 +124,9 @@ norm = mpl.colors.LogNorm(vmin=vmin, vmax=F.max())
 fig, ax = plt.subplots(figsize=(10, 8))
 ax.axis("off")
 edges.plot(ax=ax, column="flow", cmap=cmap, norm=norm, zorder=1)
+nodes[nodes["source_node"]].plot(ax=ax, color="red", zorder=2)
+
+# nodes.plot(column="demand", cmap="coolwarm", ax=ax, zorder=2, legend=True)
 districts.plot(ax=ax, color="lightgrey", zorder=0, alpha=0.2)
 districts.boundary.plot(ax=ax, color="black", zorder=0, linewidth=0.5)
 cbar = plt.colorbar(
@@ -148,6 +146,28 @@ ax.set_title("SC = {:.0f}".format(total_social_cost(G)))
 
 
 # %%
+
+F_list = []
+for k in range(3, 150):
+    print(k)
+    selected_nodes = og.select_evenly_distributed_nodes(G, k)
+    demands, nodes = demand_list(
+        G,
+        commodity=selected_nodes,
+    )
+    F = mc.solve_multicommodity_tap(
+        G, demands, social_optimum=False, max_iter=50_000, eps_rel=1e-5
+    )
+    F_list.append(F)
+
+# %%
+Farr = np.array(F_list)
+
+for i in range(Farr.shape[0]):
+    plt.plot(Farr[:, i] / Farr[-1, i])
+
+plt.grid()
+plt.legend()
 
 
 # %%
