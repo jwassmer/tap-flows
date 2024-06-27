@@ -11,8 +11,8 @@ from shapely.geometry import Point, MultiPoint, Polygon
 import requests
 from io import StringIO
 import pandas as pd
-from geopy.geocoders import Nominatim
 
+from sklearn.cluster import KMeans
 
 from geopy.geocoders import Nominatim
 
@@ -20,6 +20,53 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 
 PATH_TO_GHSL_TIF = "data/GHS/GHS_POP_P2030_GLOBE_R2022A_54009_100_V1_0.tif"
+
+
+def select_evenly_distributed_nodes(G, N):
+    """
+    Selects N points from the GeoDataFrame such that they are evenly spatially distributed.
+
+    Parameters:
+    - G (Graph): graph whch nodes containing spatially distributed points.
+    - N (int): Number of points to select.
+
+    Returns:
+    - GeoDataFrame: GeoDataFrame containing the selected points.
+    """
+    gdf = ox.graph_to_gdfs(G, nodes=True, edges=False)
+    # Ensure the GeoDataFrame has the necessary geometry column
+    if gdf.geometry.name != "geometry":
+        raise ValueError("GeoDataFrame must have a geometry column named 'geometry'")
+
+    # Extract the coordinates of the points
+    coords = np.array(list(zip(gdf.geometry.x, gdf.geometry.y)))
+
+    # Perform KMeans clustering
+    kmeans = KMeans(n_clusters=N, n_init=100, random_state=0)
+    kmeans.fit(coords)
+
+    # Find the closest point to each cluster centroid
+    selected_indices = []
+    for centroid in kmeans.cluster_centers_:
+        distances = np.linalg.norm(coords - centroid, axis=1)
+        closest_index = np.argmin(distances)
+        selected_indices.append(closest_index)
+
+    # Create a new GeoDataFrame with the selected points
+    selected_gdf = gdf.iloc[selected_indices]
+
+    mask = gdf.geometry.union_all().convex_hull.buffer(1e-3)
+    voronoi_gdf = compute_voronoi_polys_of_nodes(selected_gdf, mask=mask)
+
+    for i, row in voronoi_gdf.iterrows():
+        vor_geom = row["voronoi"]
+        vorpop = gdf[gdf.geometry.within(vor_geom)]["population"].sum()
+        voronoi_gdf.loc[i, "population"] = vorpop
+
+    # gdf.loc[gdf.geometry.within(voronoi_gdf.geometry), "population"]
+    voronoi_gdf.set_geometry("geometry", inplace=True)
+    voronoi_gdf.set_crs(gdf.crs, inplace=True)
+    return voronoi_gdf
 
 
 def assign_nodes_to_districts(nodes, districts):
@@ -137,7 +184,7 @@ def voronoi_finite_polygons_2d(vor, radius=None):
     return new_regions, np.asarray(new_vertices)
 
 
-def compute_voronoi_polys_of_nodes(nodes):
+def compute_voronoi_polys_of_nodes(nodes, mask=None):
     """
     Compute Voronoi polygons for a set of nodes.
 
@@ -152,13 +199,15 @@ def compute_voronoi_polys_of_nodes(nodes):
     vor = Voronoi(points)
     regions, vertices = voronoi_finite_polygons_2d(vor)
 
-    pts = MultiPoint([Point(i) for i in points])
-    mask = pts.convex_hull
+    if mask is None:
+        pts = MultiPoint([Point(i) for i in points])
+        mask = pts.convex_hull
     voronoi_polys = gpd.GeoSeries([Polygon(vertices[region]) for region in regions])
     voronoi_polys = voronoi_polys.intersection(mask)
 
     vor_nodes["voronoi"] = list(voronoi_polys)
     vor_nodes = vor_nodes.set_geometry("voronoi").set_crs(nodes.crs)
+
     return vor_nodes
 
 
@@ -428,8 +477,16 @@ if __name__ == "__main__":
 
     nodes, edges = ox.graph_to_gdfs(G)
     # %%
-    fig, ax = plt.subplots(figsize=(10, 10))
-    nodes.plot("district", ax=ax)
-    # nodes[nodes["district"].isna()].plot(ax=ax, color="black", marker="x")
 
-    # %%
+    # Example usage
+
+    N = 100
+    nodes_select = select_evenly_distributed_nodes(nodes, N)
+
+    fig, ax = plt.subplots(figsize=(10, 10))
+    # nodes.plot(ax=ax, marker=".", zorder=2, color="lightgrey")
+    edges.plot(ax=ax, zorder=2, color="white", linewidth=0.5)
+    nodes_select.set_geometry("voronoi").plot("population", ax=ax, markersize=50)
+    nodes_select.plot(ax=ax, color="red", markersize=10, zorder=2)
+
+# %%

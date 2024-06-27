@@ -37,7 +37,7 @@ def price_of_anarchy(G, demands):
     return ue_cost - so_cost
 
 
-def solve_multicommodity_tap(G, demands, social_optimum=False):
+def solve_multicommodity_tap(G, demands, social_optimum=False, **kwargs):
     """
     Solves the multicommodity flow problem using CVXPY for a given graph,
     demands, and linear cost function parameters alpha and beta.
@@ -84,12 +84,15 @@ def solve_multicommodity_tap(G, demands, social_optimum=False):
 
     # Define the problem and solve it
     prob = cp.Problem(objective, constraints)
-    prob.solve(solver=cp.MOSEK)
+    # Extracting specific kwargs if provided, otherwise setting default values
+    solver = kwargs.pop("solver", cp.OSQP)
+    eps_rel = kwargs.pop("eps_rel", 1e-6)
+    prob.solve(solver=solver, eps_rel=eps_rel, **kwargs)
 
     # Extract the flows for each commodity
     # flows_value = [f.value for f in flows]
     conv_time = time.time() - start_time
-    # print("Time:", conv_time, "s")
+    print("Time:", conv_time, "s")
 
     return total_flow.value
 
