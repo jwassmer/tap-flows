@@ -2,6 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import zscore
+import pandas as pd
 
 
 from src import osmGraphs as og
@@ -9,9 +10,22 @@ from src import multiCommodityTAP as mc
 
 # %%
 
-fig, ax = plt.subplots(figsize=(8, 6))
-cities = ["Potsdam,Germany", "Prenzlauer Berg,Berlin,Germany", "Nippes,Cologne,Germany"]
 
+cities = [
+    "Berlin,Germany",
+    "Cologne,Germany",
+    "Potsdam,Germany",
+    "Heidelberg,Germany",
+    "Prenzlauer Berg,Berlin,Germany",
+    "Nippes,Cologne,Germany",
+]
+
+kappa_max = 200
+kappa_step = 10
+
+kappas = range(10, kappa_max, kappa_step)
+
+df = pd.DataFrame(index=kappas)
 for city in cities:
     print(city)
     G, districts = og.osmGraph(city, return_districts=True)
@@ -23,7 +37,7 @@ for city in cities:
     )
 
     F_list = []
-    kappa = range(3, min([len(G.nodes), 150]), 3)
+    kappa = range(10, min([len(G.nodes), kappa_max]), kappa_step)
     for k in kappa:
         print(k)
         selected_nodes = og.select_evenly_distributed_nodes(G, k)
@@ -54,16 +68,26 @@ for city in cities:
     F_conv_no_outliers[inds] = np.take(col_mean, inds[1])
 
     var = np.var(F_conv_no_outliers, axis=1)
+    if len(var) < len(kappas):
+        var = np.append(var, [np.nan] * (len(kappas) - len(var)))
 
-    ax.plot(kappa, var, marker=".", label=city)
+    df[city] = var
+
+
+df.to_csv("data/commodity_convergence.csv")
+
+# %%
+fig, ax = plt.subplots(figsize=(8, 6))
+
+for city in cities:
+    var = df[city]
+
+    ax.plot(df.index, var, marker=".", label=city)
     ax.grid()
     ax.set_yscale("log")
     ax.set_xlabel(r"$\kappa$")
-    ax.set_ylabel(r"$\sigma^2(f_e)$")
+    ax.set_ylabel(r"$\sigma^2(f^{\kappa}_e - f_e)$")
     ax.legend()
-
-# %%
-
-plt.plot(Farr - Farr[-1, :], marker=".")
-plt.grid()
+# plt.plot(Farr - Farr[-1, :], marker=".")
+# plt.grid()
 # %%
