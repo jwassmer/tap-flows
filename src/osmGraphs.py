@@ -22,6 +22,36 @@ import matplotlib as mpl
 PATH_TO_GHSL_TIF = "data/GHS/GHS_POP_P2030_GLOBE_R2022A_54009_100_V1_0.tif"
 
 
+def demand_list(G, commodity, gamma=0.1):
+    nodes, edges = ox.graph_to_gdfs(G)
+    nodes["source_node"] = False
+
+    demands = []
+    tot_pop = 0
+    for idx, row in commodity.iterrows():
+        pop_com = row["population"]
+        vor_geom = row["voronoi"]
+        source_node = idx
+        target_nodes = nodes[~nodes["geometry"].within(vor_geom)].index
+
+        # random_com_node = np.random.choice(com_nodes)
+        nodes.loc[source_node, "source_node"] = True
+
+        P = dict(zip(G.nodes(), np.zeros(G.number_of_nodes())))
+        # for node in com_nodes:
+        P[source_node] = pop_com * gamma  # / len(com_nodes)
+        # P[random_com_node] = pop_com
+        for node in target_nodes:
+            P[node] = -pop_com * gamma / len(target_nodes)
+        # print(sum(P.values()))
+
+        demands.append(list(P.values()))
+        # print(c, pop_com)
+        tot_pop += pop_com
+    # print("Total Population:", tot_pop)
+    return demands, nodes
+
+
 def select_evenly_distributed_nodes(G, N):
     """
     Selects N points from the GeoDataFrame such that they are evenly spatially distributed.

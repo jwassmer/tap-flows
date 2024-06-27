@@ -61,42 +61,12 @@ def total_potential_energy(G):
     )
 
 
-def demand_list(G, commodity, gamma=0.1):
-    nodes, edges = ox.graph_to_gdfs(G)
-    nodes["source_node"] = False
-
-    demands = []
-    tot_pop = 0
-    for idx, row in commodity.iterrows():
-        pop_com = row["population"]
-        vor_geom = row["voronoi"]
-        source_node = idx
-        target_nodes = nodes[~nodes["geometry"].within(vor_geom)].index
-
-        # random_com_node = np.random.choice(com_nodes)
-        nodes.loc[source_node, "source_node"] = True
-
-        P = dict(zip(G.nodes(), np.zeros(G.number_of_nodes())))
-        # for node in com_nodes:
-        P[source_node] = pop_com * gamma  # / len(com_nodes)
-        # P[random_com_node] = pop_com
-        for node in target_nodes:
-            P[node] = -pop_com * gamma / len(target_nodes)
-        # print(sum(P.values()))
-
-        demands.append(list(P.values()))
-        # print(c, pop_com)
-        tot_pop += pop_com
-    # print("Total Population:", tot_pop)
-    return demands, nodes
-
-
 # %%
 G, districts = og.osmGraph("Potsdam,Germany", return_districts=True)
 selected_nodes = og.select_evenly_distributed_nodes(G, 30)
 
 # %%
-demands, nodes = demand_list(
+demands, nodes = og.demand_list(
     G,
     commodity=selected_nodes,
 )
@@ -146,32 +116,6 @@ ax.set_title("SC = {:.0f}".format(total_social_cost(G)))
 
 
 # %%
-
-F_list = []
-for k in range(3, 150):
-    print(k)
-    selected_nodes = og.select_evenly_distributed_nodes(G, k)
-    demands, nodes = demand_list(
-        G,
-        commodity=selected_nodes,
-    )
-    F = mc.solve_multicommodity_tap(
-        G, demands, social_optimum=False, max_iter=50_000, eps_rel=1e-5
-    )
-    F_list.append(F)
-
-# %%
-Farr = np.array(F_list)
-
-for i in range(Farr.shape[0]):
-    plt.plot(Farr[:, i] / Farr[-1, i])
-
-plt.grid()
-plt.legend()
-
-
-# %%
-
 
 edge = list(G.edges(data=True))[0][-1]
 l, m, v = edge["length"], edge["lanes"], edge["speed_kph"] / 3.6
@@ -224,8 +168,5 @@ plt.grid(True)
 plt.show()
 
 fig.savefig("figs/daganzo_vs_linear.png", bbox_inches="tight", dpi=300)
-
-# %%
-
 
 # %%
