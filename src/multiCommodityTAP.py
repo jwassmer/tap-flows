@@ -84,7 +84,7 @@ def solve_multicommodity_tap(G, demands, social_optimum=False):
 
     # Define the problem and solve it
     prob = cp.Problem(objective, constraints)
-    prob.solve(eps_rel=1e-7)
+    prob.solve(solver=cp.MOSEK)
 
     # Extract the flows for each commodity
     # flows_value = [f.value for f in flows]

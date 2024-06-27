@@ -26,7 +26,7 @@ mc.price_of_anarchy(G, demands)
 # %%
 Fue = mc.solve_multicommodity_tap(G, demands, social_optimum=False)
 Fso = mc.solve_multicommodity_tap(G, demands, social_optimum=True)
-pl.graphPlotCC(G, cc=Fue)  # , edge_labels=dict(zip(G.edges, Fue)))
+# pl.graphPlotCC(G, cc=Fue)  # , edge_labels=dict(zip(G.edges, Fue)))
 
 # %%
 print("User Equilibrium:")

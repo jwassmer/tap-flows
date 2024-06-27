@@ -8,7 +8,6 @@ import matplotlib as mpl
 from scipy.integrate import quad
 import cvxpy as cp
 import time
-import numpy as np
 
 from src import multiCommodityTAP as mc
 from src import Plotting as pl
