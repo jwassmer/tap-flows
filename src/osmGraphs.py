@@ -19,6 +19,8 @@ from geopy.geocoders import Nominatim
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
+from src import periodicBoudary as pb
+
 PATH_TO_GHSL_TIF = "data/GHS/GHS_POP_P2030_GLOBE_R2022A_54009_100_V1_0.tif"
 
 
@@ -232,7 +234,13 @@ def compute_voronoi_polys_of_nodes(nodes, mask=None):
     if mask is None:
         pts = MultiPoint([Point(i) for i in points])
         mask = pts.convex_hull
-    voronoi_polys = gpd.GeoSeries([Polygon(vertices[region]) for region in regions])
+
+    if isinstance(mask, gpd.GeoDataFrame) or isinstance(mask, gpd.GeoSeries):
+        mask = mask.geometry.union_all().convex_hull
+
+    voronoi_polys = gpd.GeoSeries(
+        [Polygon(vertices[region]) for region in regions]
+    ).set_crs(nodes.crs)
     voronoi_polys = voronoi_polys.intersection(mask)
 
     vor_nodes["voronoi"] = list(voronoi_polys)
@@ -253,15 +261,15 @@ def clip_to_gdf(voronoi_nodes, raster_path):
         xarray.DataArray: Clipped raster data.
     """
     # Read raster
-    raster = riox.open_rasterio(raster_path)
+    raster = riox.open_rasterio(raster_path, masked=True)
 
     # update crs
     crs = raster.spatial_ref.crs_wkt
     voronoi_nodes = voronoi_nodes.to_crs(crs)
 
     # clip to convex hull of gdf
-    clipped = raster.rio.clip_box(*voronoi_nodes.unary_union.bounds)
-    clipped = clipped.rio.clip([voronoi_nodes.unary_union.convex_hull])
+    clipped = raster.rio.clip_box(*voronoi_nodes.union_all().bounds)
+    clipped = clipped.rio.clip([voronoi_nodes.union_all().convex_hull])
     return clipped
 
 
@@ -465,10 +473,18 @@ def set_effective_travel_time(G, gamma=1):
 def osmGraph(
     place_name,
     highway_filter='["highway"~"motorway|trunk|primary|secondary|tertiary|unclassified|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link"]',
-    return_districts=False,
+    return_boundary=False,
+    heavy_boundary=False,
+    **kwargs,
 ):
     # Fetch the road network graph for the specified place
-    graph = ox.graph_from_place(place_name, custom_filter=highway_filter)
+    city_boundary, districts10, districts9 = get_city_and_district_boundaries(
+        place_name
+    )
+
+    city_hull = city_boundary.geometry.convex_hull
+
+    graph = ox.graph_from_polygon(city_hull.iloc[0], custom_filter=highway_filter)
     gcc_nodes = max(nx.strongly_connected_components(graph), key=len)
     graph = graph.subgraph(gcc_nodes)
 
@@ -476,9 +492,7 @@ def osmGraph(
     graph = ox.add_edge_travel_times(graph)
     # print(graph)
     graph = population_to_graph_nodes(graph)
-    city_boundary, districts10, districts9 = get_city_and_district_boundaries(
-        place_name
-    )
+
     nodes, edges = ox.graph_to_gdfs(graph)
     districts = districts9
     nodes = assign_nodes_to_districts(nodes, districts)
@@ -491,9 +505,13 @@ def osmGraph(
     graph = set_number_of_lanes(graph)
     graph = set_effective_travel_time(graph)
 
+    if heavy_boundary:
+        buffer_meter = kwargs.pop("buffer_meter", 10_000)
+        graph = pb.set_boundary_population(graph, buffer_metre=buffer_meter)
+
     print(graph)
-    if return_districts:
-        return graph, districts
+    if return_boundary:
+        return graph, city_boundary
     return graph
 
 
@@ -503,7 +521,7 @@ if __name__ == "__main__":
     # Define the place name or address
     place_name = "Cologne, Germany"
 
-    G = osmGraph(place_name)
+    G = osmGraph(place_name, heavy_boundary=True)
 
     nodes, edges = ox.graph_to_gdfs(G)
     # %%
