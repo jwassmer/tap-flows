@@ -62,7 +62,9 @@ def convex_optimization_linflow(G, P=None, K=None, weight="weight"):
     return flow_values
 
 
-def convex_optimization_kcl_tap(G, solver=cp.OSQP, verbose=False):
+def convex_optimization_kcl_tap(
+    G, P=None, solver=cp.OSQP, verbose=False, positive_constraint=True
+):
     # Get the number of edges and nodes
     num_edges = G.number_of_edges()
 
@@ -73,7 +75,8 @@ def convex_optimization_kcl_tap(G, solver=cp.OSQP, verbose=False):
     betas = np.array([tt_funcs[e](0) for e in G.edges()])
     alphas = np.array([tt_funcs[e](1) - tt_funcs[e](0) for e in G.edges()])
 
-    P = list(nx.get_node_attributes(G, "P").values())
+    if P is None:
+        P = list(nx.get_node_attributes(G, "P").values())
 
     # Define the flow variable f_e
     f = cp.Variable(num_edges)
@@ -83,7 +86,9 @@ def convex_optimization_kcl_tap(G, solver=cp.OSQP, verbose=False):
     # objective = cp.Minimize(cp.sum(cp.abs(f**3)))
 
     # Constraints: E @ f = p
-    constraints = [E @ f == P, f >= np.zeros(num_edges)]
+    constraints = [E @ f == P]
+    if positive_constraint:
+        constraints.append(f >= np.zeros(num_edges))
 
     # Define the problem
     problem = cp.Problem(objective, constraints)

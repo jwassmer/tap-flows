@@ -3,7 +3,6 @@ import pytest
 import networkx as nx
 import numpy as np
 import cvxpy as cp
-from src import Equilibirium as eq
 from src import ConvexOptimization as co
 from src import TAPOptimization as tap
 import time
@@ -38,7 +37,8 @@ def test_user_equilibrium(num_nodes, edge_prob, seed, setup_graph):
     G, A = setup_graph(num_nodes, edge_prob, seed)
     B = np.zeros((num_nodes, num_nodes))
     B[:, 0] = A[:, 0]
-    F = tap.user_equilibrium(G, A, positive_constraint=True)
+    P = A[:, 0]
+    F = tap.user_equilibrium(G, P, positive_constraint=True)
     E = -nx.incidence_matrix(G, oriented=True).toarray()
     assert (
         len(F) == G.number_of_edges()
@@ -46,7 +46,7 @@ def test_user_equilibrium(num_nodes, edge_prob, seed, setup_graph):
     assert np.all(
         F >= -1e-7
     ), "Flow values should be non-negative when positive constraint is applied."
-    f = tap.user_equilibrium(G, B, positive_constraint=True)
+    f = tap.user_equilibrium(G, P, positive_constraint=True)
     assert all(np.isclose(E @ f, B[:, 0])), "Flow must satisfy the demand constraints."
 
 
@@ -65,7 +65,7 @@ def test_linear_tap_solver(num_nodes, edge_prob, seed, setup_graph):
     P = A[:, 0]
     B = np.zeros((num_nodes, num_nodes))
     B[:, 0] = P
-    fue = tap.user_equilibrium(G, B, positive_constraint=False)
+    fue = tap.user_equilibrium(G, P, positive_constraint=False)
     flin, lamb = tap.linearTAP(G, P)
 
     assert np.all(
@@ -87,13 +87,13 @@ if __name__ == "__main__":
         num_nodes=num_nodes,
         num_edges=num_edges,
         seed=seed,
-        alpha="random",
-        beta="random",
+        alpha=10,
+        beta=10,
     )
     A = tap.ODmatrix(G)
-    B = np.zeros((num_nodes, num_nodes))
-    B[:, 0] = A[:, 0]
-    F = tap.user_equilibrium(G, A, positive_constraint=True)
+
+    P = A[:, 0]
+    F = tap.user_equilibrium(G, P, positive_constraint=True)
     E = -nx.incidence_matrix(G, oriented=True).toarray()
     assert (
         len(F) == G.number_of_edges()
@@ -101,7 +101,22 @@ if __name__ == "__main__":
     assert np.all(
         F >= -1e-7
     ), "Flow values should be non-negative when positive constraint is applied."
-    f = tap.user_equilibrium(G, B, positive_constraint=True)
-    assert all(np.isclose(E @ f, B[:, 0])), "Flow must satisfy the demand constraints."
+    f = tap.user_equilibrium(G, P, positive_constraint=True)
+    assert all(np.isclose(E @ f, P)), "Flow must satisfy the demand constraints."
 
-# %%
+    # %%
+
+    G = G.to_undirected()
+
+    P = np.zeros(G.number_of_nodes())
+    P[0], P[-1] = 100, -100
+
+    fue = tap.user_equilibrium(G, P, positive_constraint=False)
+    flin, lamb = tap.linearTAP(G, P)
+
+    flin - fue
+    # %%
+    nx.set_node_attributes(G, dict(zip(G.nodes, P)), "P")
+    feq = co.convex_optimization_kcl_tap(G, positive_constraint=False)
+    feq - fue
+    # %%

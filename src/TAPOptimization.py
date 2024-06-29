@@ -4,6 +4,7 @@ import numpy as np
 import time
 from scipy.optimize import linprog
 from scipy.linalg import null_space
+import matplotlib.pyplot as plt
 
 import cvxpy as cp
 
@@ -28,7 +29,7 @@ def potential_energy(G, F):
     return np.sum(1 / 2 * alpha @ F**2 + beta @ F)
 
 
-def social_optimum(G, P):
+def social_optimum(G, P, positive_constraint=True):
     num_nodes = G.number_of_nodes()
     num_edges = G.number_of_edges()
 
@@ -42,7 +43,10 @@ def social_optimum(G, P):
     alpha_e = np.array([tt_func[e](1) - tt_func[e](0) for e in G.edges()])
 
     # Define the variable F
-    fe = cp.Variable(num_edges)
+    if positive_constraint:
+        fe = cp.Variable(num_edges, nonneg=True)
+    else:
+        fe = cp.Variable(num_edges)
 
     # Define the objective function
     objective = cp.Minimize(cp.sum(alpha_e @ fe**2 + beta_e @ fe))
@@ -55,8 +59,6 @@ def social_optimum(G, P):
             E @ fe == P,
             cp.sum(fe, axis=1) <= maxx,
         ]
-
-    constraints.append(fe >= np.zeros(num_edges))
 
     # Define the problem
     problem = cp.Problem(objective, constraints)
@@ -90,10 +92,13 @@ def user_equilibrium(G, P, positive_constraint=True):
     alpha_e = np.array([tt_func[e](1) - tt_func[e](0) for e in G.edges()])
 
     # Define the variable F
-    fe = cp.Variable(num_edges)
+    if positive_constraint:
+        fe = cp.Variable(num_edges, nonneg=True)
+    else:
+        fe = cp.Variable(num_edges)
 
     # Define the objective function
-    objective = cp.Minimize(cp.sum(1 / 2 * alpha_e @ fe**2 + beta_e @ fe))
+    objective = cp.Minimize(1 / 2 * alpha_e @ fe**2 + beta_e @ fe)
     # objective = cp.Minimize(cp.sum(list(map(lambda f: f(0), func_list))))
 
     # Define the constraints
@@ -106,9 +111,6 @@ def user_equilibrium(G, P, positive_constraint=True):
             # fe >= np.zeros((num_edges, num_nodes)),
             cp.sum(fe, axis=1) <= maxx,
         ]
-
-    if positive_constraint:
-        constraints.append(fe >= np.zeros(num_edges))
 
     # Define the problem
     problem = cp.Problem(objective, constraints)
@@ -200,30 +202,24 @@ def linearTAP(G, P):
     alpha_dict = dict(zip(G.edges, alpha))
     beta_dict = dict(zip(G.edges, beta))
     Gamma = np.zeros((num_nodes, num_nodes))
+    for e in G.edges:
+        i, j = e
+        a = alpha_dict[e]
+        b = beta_dict[e]
+        gamma = b / a
+        Gamma[i, j] += gamma
+        Gamma[j, i] -= gamma
+
     if G.is_directed():
         superL = L + L.T
         np.fill_diagonal(superL, 0)
         np.fill_diagonal(superL, -np.sum(superL, axis=0))
-        for e in G.edges:
-            i, j = e
-            a = alpha_dict[e]
-            b = beta_dict[e]
-            gamma = b / a
-            Gamma[i, j] += gamma
-            Gamma[j, i] -= gamma
-        lamb = np.linalg.pinv(superL) @ (P + Gamma @ (num_nodes * np.ones(num_nodes)))
-
+        lamb = np.linalg.pinv(superL) @ (P + Gamma @ np.ones(num_nodes))
     else:
-        for e in G.edges:
-            i, j = e
-            a = alpha_dict[e]
-            b = beta_dict[e]
-            gamma = b / a
-            Gamma[i, j] += gamma
-            Gamma[j, i] -= gamma
-        lamb = np.linalg.pinv(L) @ (P + Gamma @ (num_nodes * np.ones(num_nodes)))
+        lamb = np.linalg.pinv(L) @ (P + Gamma @ np.ones(num_nodes))
 
-    f_alg = ((E.T @ lamb) - (num_nodes * beta)) / alpha
+    f_alg = (E.T @ lamb) / alpha - beta / alpha
+    # f_alg += beta * (num_nodes - 1) / alpha
     print("Time:", time.time() - start_time, "s")
     return f_alg, lamb
 
@@ -237,51 +233,60 @@ def ODmatrix(G):
 
 # %%
 if __name__ == "__main__":
-    num_nodes = 20
+    num_nodes = 10
     num_edges = int(num_nodes * 1.2)
+    alpha = "random"
+    beta = "random"
 
     # Example graph creation
     G = random_graph(
         seed=42,
         num_nodes=num_nodes,
         num_edges=num_edges,
-        alpha="random",
-        beta="random",
+        alpha=alpha,
+        beta=beta,
     )
-    # edges = list(G.edges())
-    # edges_to_remove = np.random.choice(range(len(edges)), 20, replace=False)
-    # G.remove_edges_from([edges[i] for i in edges_to_remove])
-
-    A = ODmatrix(G)
-    B = np.zeros((num_nodes, num_nodes))
-    B[:, 0] = A[:, 0]
-
-    # xmax = np.array([10 for e in G.edges()])
-    # nx.set_edge_attributes(G, dict(zip(G.edges, xmax)), "xmax")
-    F = user_equilibrium(G, B, positive_constraint=False)
-    nx.set_edge_attributes(G, dict(zip(G.edges, F)), "flow")
-    pl.graphPlotCC(G, cc=F)
-
-    posF = user_equilibrium(G, B, positive_constraint=True)
-    nx.set_edge_attributes(G, dict(zip(G.edges, posF)), "flow")
-    pl.graphPlotCC(G, cc=posF, norm="LogNorm")
-    # f = dict(zip(G.edges, F))
+    G = G.to_undirected()
     E = -nx.incidence_matrix(G, oriented=True).toarray()
-    print(np.isclose(E @ F, B[:, 0]))
 
-    f = linearTAP(G, B[:, 0])
+    P = np.zeros(G.number_of_nodes())
+    P[0], P[1:] = 1, -1 / (num_nodes - 1)
+
+    F = user_equilibrium(G, P, positive_constraint=False)
+    nx.set_edge_attributes(G, dict(zip(G.edges, F)), "flow")
+
+    print(np.isclose(E @ F, P))
+
+    f, lamb = linearTAP(G, P)
+    # f += beta * (num_nodes - 1) / alpha
+
     print(np.abs(f - F) < 1e-5)
 
+    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+    cbar = False
+
+    # nc = dict(zip(G.nodes, nc))
+    for i, ax in enumerate(axs):
+        if i == 0:
+            pl.graphPlotCC(G, cc=f, edge_labels=dict(zip(G.edges, f)), ax=ax, cbar=cbar)
+        elif i == 1:
+            pl.graphPlotCC(G, cc=F, edge_labels=dict(zip(G.edges, F)), ax=ax, cbar=cbar)
+            cbar = True
+
+        # fpos = tap.user_equilibrium(G, A, positive_constraint=True)
+
     # %%
-    g = G  # .to_undirected()
 
-    P = np.zeros(g.number_of_nodes())
-    P[16], P[15] = 100, -100
-    E = -nx.incidence_matrix(g, oriented=True)
+    P = np.zeros(G.number_of_nodes())
+    P[0], P[-1] = 100, -100
 
-    f = linearTAP(g, P)
-    pl.graphPlotCC(g, cc=f)
-    E @ f
+    f, lamb = linearTAP(G, P)
+    fue = user_equilibrium(G, P, positive_constraint=False)
+    # pl.graphPlotCC(g, cc=f)
     np.isclose(E @ f, P)
+    print(np.abs(f - fue) < 1e-5)
 
     # %%
+
+    f
+# %%
