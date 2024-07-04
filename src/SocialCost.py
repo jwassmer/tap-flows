@@ -57,10 +57,10 @@ def slope_social_cost(G, P, edge):
     L = E @ np.diag(1 / alpha_arr) @ E.T
     Linv = np.linalg.pinv(L)
 
-    return slope_socia_cost_ab(G, Linv, P, edge, alpha_arr)
+    return derivative_socia_cost_ab(G, Linv, P, edge, alpha_arr)
 
 
-def slope_socia_cost_ab(G, Linv, P, edge, alpha_arr):
+def derivative_socia_cost_ab(G, Linv, P, edge, alpha_arr):
     a, b = edge
     edge_idx = list(G.edges).index(edge)
     P = np.array(P)
@@ -96,13 +96,13 @@ def linreg_slope_sc(G, P, edge):
     return m
 
 
-def all_social_cost_slopes(G, P, alpha_arr):
+def all_social_cost_derivatives(G, P, alpha_arr):
     E = -nx.incidence_matrix(G, oriented=True)
     L = E @ np.diag(1 / alpha_arr) @ E.T
     Linv = np.linalg.pinv(L)
     slopes = {}
     for e in G.edges():
-        s = slope_socia_cost_ab(G, Linv, P, e, alpha_arr)
+        s = derivative_socia_cost_ab(G, Linv, P, e, alpha_arr)
         slopes[e] = s
     return slopes
 

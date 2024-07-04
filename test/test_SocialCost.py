@@ -44,7 +44,7 @@ def test_social_cost_slope(num_nodes, edge_prob, seed, setup_graph):
     tt_fs = nx.get_edge_attributes(G, "tt_function")
     alpha_arr = np.array([tt_fs[e](1) - tt_fs[e](0) for e in G.edges()])
 
-    slopes = sc.all_social_cost_slopes(G, P, alpha_arr)
+    slopes = sc.all_social_cost_derivatives(G, P, alpha_arr)
 
     isclose_arr = {}
     for edge, slope in slopes.items():
