@@ -62,12 +62,13 @@ def total_potential_energy(G):
 
 
 # %%
-G, districts = og.osmGraph("Potsdam,Germany", return_districts=True)
-selected_nodes = og.select_evenly_distributed_nodes(G, 30)
+G = og.osmGraph("Potsdam,Germany")
+nodes = ox.graph_to_gdfs(G, nodes=True, edges=False)
+selected_nodes = og.select_evenly_distributed_nodes(nodes, 30)
 
 # %%
-demands, nodes = og.demand_list(
-    G,
+demands = og.demand_list(
+    nodes,
     commodity=selected_nodes,
 )
 
@@ -97,8 +98,8 @@ edges.plot(ax=ax, column="flow", cmap=cmap, norm=norm, zorder=1)
 nodes[nodes["source_node"]].plot(ax=ax, color="red", zorder=2)
 
 # nodes.plot(column="demand", cmap="coolwarm", ax=ax, zorder=2, legend=True)
-districts.plot(ax=ax, color="lightgrey", zorder=0, alpha=0.2)
-districts.boundary.plot(ax=ax, color="black", zorder=0, linewidth=0.5)
+# districts.plot(ax=ax, color="lightgrey", zorder=0, alpha=0.2)
+# districts.boundary.plot(ax=ax, color="black", zorder=0, linewidth=0.5)
 cbar = plt.colorbar(
     plt.cm.ScalarMappable(norm=norm, cmap=cmap),
     ax=ax,
@@ -126,12 +127,14 @@ t_min = l / v
 
 eff_func = og.effective_travel_time(edge)
 linear_func = og.linear_function(edge)
+alpha = round(linear_func(1) - linear_func(0), 1)
+beta = round(linear_func(0), 1)
 # potential_energy_func = potential_energy(edge)
 
 
 xmax = edge["xmax"]
 xmin = edge["xmin"]
-beta = edge["beta"]
+# beta = edge["beta"]
 
 
 # Generate L values
@@ -152,7 +155,7 @@ plt.plot(
 plt.plot(
     x_values,
     linear_values,
-    label="Linear $c(f_e) = \\alpha_e f_e + \\beta_e$",
+    label=rf"Linear $c(f_e) = {alpha}[s] f_e + {beta} [s]$",
     color="red",
     linestyle="--",
 )

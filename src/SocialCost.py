@@ -61,11 +61,16 @@ def slope_social_cost(G, P, edge):
 
 
 def derivative_socia_cost_ab(G, Linv, P, edge, alpha_arr):
-    a, b = edge
+    a, b = edge[0], edge[1]
+
+    a_idx = list(G.nodes).index(a)
+    b_idx = list(G.nodes).index(b)
+
     edge_idx = list(G.edges).index(edge)
+
     P = np.array(P)
 
-    slope = (Linv[a, :] - Linv[b, :]) @ P / alpha_arr[edge_idx]
+    slope = (Linv[a_idx, :] - Linv[b_idx, :]) @ P / alpha_arr[edge_idx]
     return slope
 
 
@@ -101,7 +106,8 @@ def all_social_cost_derivatives(G, P, alpha_arr):
     L = E @ np.diag(1 / alpha_arr) @ E.T
     Linv = np.linalg.pinv(L)
     slopes = {}
-    for e in G.edges():
+
+    for e in G.edges:
         s = derivative_socia_cost_ab(G, Linv, P, e, alpha_arr)
         slopes[e] = s
     return slopes

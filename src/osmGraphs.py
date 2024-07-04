@@ -24,8 +24,16 @@ from src import periodicBoudary as pb
 PATH_TO_GHSL_TIF = "data/GHS/GHS_POP_P2030_GLOBE_R2022A_54009_100_V1_0.tif"
 
 
-def demand_list(G, commodity, gamma=0.1):
-    nodes, edges = ox.graph_to_gdfs(G)
+def demands(G, num_commodities=1, gamma=0.1):
+    nodes = ox.graph_to_gdfs(G, edges=False)
+    selected_nodes = select_evenly_distributed_nodes(nodes, num_commodities)
+
+    demands = demand_list(nodes, commodity=selected_nodes, gamma=gamma)
+    return demands
+
+
+def demand_list(nodes, commodity, gamma=0.1):
+    # nodes, edges = ox.graph_to_gdfs(G)
     nodes["source_node"] = False
 
     demands = []
@@ -39,7 +47,7 @@ def demand_list(G, commodity, gamma=0.1):
         # random_com_node = np.random.choice(com_nodes)
         nodes.loc[source_node, "source_node"] = True
 
-        P = dict(zip(G.nodes(), np.zeros(G.number_of_nodes())))
+        P = dict(zip(nodes.index, np.zeros(len(nodes))))
         # for node in com_nodes:
         P[source_node] = pop_com * gamma  # / len(com_nodes)
         # P[random_com_node] = pop_com
@@ -51,10 +59,10 @@ def demand_list(G, commodity, gamma=0.1):
         # print(c, pop_com)
         tot_pop += pop_com
     # print("Total Population:", tot_pop)
-    return demands, nodes
+    return demands
 
 
-def select_evenly_distributed_nodes(G, N):
+def select_evenly_distributed_nodes(nodes_gdf, N):
     """
     Selects N points from the GeoDataFrame such that they are evenly spatially distributed.
 
@@ -65,13 +73,12 @@ def select_evenly_distributed_nodes(G, N):
     Returns:
     - GeoDataFrame: GeoDataFrame containing the selected points.
     """
-    gdf = ox.graph_to_gdfs(G, nodes=True, edges=False)
     # Ensure the GeoDataFrame has the necessary geometry column
-    if gdf.geometry.name != "geometry":
+    if nodes_gdf.geometry.name != "geometry":
         raise ValueError("GeoDataFrame must have a geometry column named 'geometry'")
 
     # Extract the coordinates of the points
-    coords = np.array(list(zip(gdf.geometry.x, gdf.geometry.y)))
+    coords = np.array(list(zip(nodes_gdf.geometry.x, nodes_gdf.geometry.y)))
 
     # Perform KMeans clustering
     kmeans = KMeans(n_clusters=N, n_init=100, random_state=0)
@@ -85,19 +92,19 @@ def select_evenly_distributed_nodes(G, N):
         selected_indices.append(closest_index)
 
     # Create a new GeoDataFrame with the selected points
-    selected_gdf = gdf.iloc[selected_indices]
+    selected_gdf = nodes_gdf.iloc[selected_indices]
 
-    mask = gdf.geometry.union_all().convex_hull.buffer(1e-3)
+    mask = nodes_gdf.geometry.unary_union.convex_hull.buffer(1e-3)
     voronoi_gdf = compute_voronoi_polys_of_nodes(selected_gdf, mask=mask)
 
     for i, row in voronoi_gdf.iterrows():
         vor_geom = row["voronoi"]
-        vorpop = gdf[gdf.geometry.within(vor_geom)]["population"].sum()
+        vorpop = nodes_gdf[nodes_gdf.geometry.within(vor_geom)]["population"].sum()
         voronoi_gdf.loc[i, "population"] = vorpop
 
     # gdf.loc[gdf.geometry.within(voronoi_gdf.geometry), "population"]
     voronoi_gdf.set_geometry("geometry", inplace=True)
-    voronoi_gdf.set_crs(gdf.crs, inplace=True)
+    voronoi_gdf.set_crs(nodes_gdf.crs, inplace=True)
     return voronoi_gdf
 
 
@@ -122,7 +129,7 @@ def assign_nodes_to_districts(nodes, districts):
 
 def get_city_and_district_boundaries(city_name):
     # Geocode the city name to get its latitude and longitude
-    geolocator = Nominatim(user_agent="city_boundaries_app")
+    geolocator = Nominatim(user_agent="x_my_city_boundaries_app")
     location = geolocator.geocode(city_name)
 
     if not location:
@@ -236,7 +243,7 @@ def compute_voronoi_polys_of_nodes(nodes, mask=None):
         mask = pts.convex_hull
 
     if isinstance(mask, gpd.GeoDataFrame) or isinstance(mask, gpd.GeoSeries):
-        mask = mask.geometry.union_all().convex_hull
+        mask = mask.geometry.unary_union.convex_hull
 
     voronoi_polys = gpd.GeoSeries(
         [Polygon(vertices[region]) for region in regions]
@@ -268,8 +275,8 @@ def clip_to_gdf(voronoi_nodes, raster_path):
     voronoi_nodes = voronoi_nodes.to_crs(crs)
 
     # clip to convex hull of gdf
-    clipped = raster.rio.clip_box(*voronoi_nodes.union_all().bounds)
-    clipped = clipped.rio.clip([voronoi_nodes.union_all().convex_hull])
+    clipped = raster.rio.clip_box(*voronoi_nodes.unary_union.bounds)
+    clipped = clipped.rio.clip([voronoi_nodes.unary_union.convex_hull])
     return clipped
 
 
