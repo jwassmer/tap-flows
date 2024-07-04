@@ -8,8 +8,6 @@ import matplotlib.pyplot as plt
 
 import cvxpy as cp
 
-from src import Equilibirium as eq
-from src import ConvexOptimization as co
 from src import Plotting as pl
 
 
@@ -29,7 +27,7 @@ def potential_energy(G, F):
     return np.sum(1 / 2 * alpha @ F**2 + beta @ F)
 
 
-def social_optimum(G, P, positive_constraint=True):
+def social_optimum(G, P, positive_constraint=True, **kwargs):
     num_nodes = G.number_of_nodes()
     num_edges = G.number_of_edges()
 
@@ -71,14 +69,16 @@ def social_optimum(G, P, positive_constraint=True):
 
     # ebc_linprog = np.sum(fe.value, axis=1)
     linprog_time = time.time() - start_time
-    print("Time:", linprog_time, "s")
-    print("Social cost:", social_cost(G, fe.value))
-    print("Potential energy:", potential_energy(G, fe.value))
-    print("Minimum:", problem.value)
+    print_time = kwargs.get("print_time", False)
+    if print_time:
+        print("Time:", linprog_time, "s")
+        print("Social cost:", social_cost(G, fe.value))
+        print("Potential energy:", potential_energy(G, fe.value))
+        print("Minimum:", problem.value)
     return fe.value
 
 
-def user_equilibrium(G, P, positive_constraint=True):
+def user_equilibrium(G, P, positive_constraint=True, **kwargs):
     num_nodes = G.number_of_nodes()
     num_edges = G.number_of_edges()
 
@@ -123,10 +123,13 @@ def user_equilibrium(G, P, positive_constraint=True):
     # ebc_linprog = np.sum(fe.value, axis=1)
     linprog_time = time.time() - start_time
     F = fe.value
-    print("Time:", linprog_time, "s")
-    print("Social cost:", social_cost(G, F))
-    print("Potential energy:", potential_energy(G, F))
-    print("Minimum:", problem.value)
+
+    print_time = kwargs.get("print_time", False)
+    if print_time:
+        print("Time:", linprog_time, "s")
+        print("Social cost:", social_cost(G, F))
+        print("Potential energy:", potential_energy(G, F))
+        print("Minimum:", problem.value)
     return F
 
 
@@ -183,11 +186,17 @@ def random_graph(
     return G
 
 
-def linearTAP(G, P):
+def linearTAP(G, P, social_optimum=False, **kwargs):
     """
     Calculate the linear TAP solution for a given graph G and OD matrix P.
     """
     start_time = time.time()
+    if social_optimum:
+        Q = 1 / 2
+    else:
+        Q = 1
+    P = np.array(P)
+
     num_nodes = G.number_of_nodes()
     tt_f = nx.get_edge_attributes(G, "tt_function")
     alpha = np.array([tt_f[e](1) - tt_f[e](0) for e in G.edges()])
@@ -199,28 +208,22 @@ def linearTAP(G, P):
     nx.set_edge_attributes(G, dict(zip(G.edges, kappa)), "kappa")
     L = nx.laplacian_matrix(G, weight="kappa").toarray()
 
-    alpha_dict = dict(zip(G.edges, alpha))
-    beta_dict = dict(zip(G.edges, beta))
-    Gamma = np.zeros((num_nodes, num_nodes))
-    for e in G.edges:
-        i, j = e
-        a = alpha_dict[e]
-        b = beta_dict[e]
-        gamma = b / a
-        Gamma[i, j] += gamma
-        Gamma[j, i] -= gamma
+    gamma = beta / alpha
+    nx.set_edge_attributes(G, dict(zip(G.edges, gamma)), "gamma")
+    A = nx.adjacency_matrix(G, weight="gamma")
+    Gamma = A - A.T
 
     if G.is_directed():
-        superL = L + L.T
-        np.fill_diagonal(superL, 0)
-        np.fill_diagonal(superL, -np.sum(superL, axis=0))
-        lamb = np.linalg.pinv(superL) @ (P + Gamma @ np.ones(num_nodes))
+        L = E @ np.diag(kappa) @ E.T
+        lamb = np.linalg.pinv(L) @ (1 / Q * P + Gamma @ np.ones(num_nodes))
     else:
-        lamb = np.linalg.pinv(L) @ (P + Gamma @ np.ones(num_nodes))
+        lamb = np.linalg.pinv(L) @ (1 / Q * P + Gamma @ np.ones(num_nodes))
 
-    f_alg = (E.T @ lamb) / alpha - beta / alpha
+    f_alg = Q * (E.T @ lamb) / alpha - Q * beta / alpha
     # f_alg += beta * (num_nodes - 1) / alpha
-    print("Time:", time.time() - start_time, "s")
+    print_time = kwargs.get("print_time", False)
+    if print_time:
+        print("Time:", time.time() - start_time, "s")
     return f_alg, lamb
 
 
@@ -229,6 +232,46 @@ def ODmatrix(G):
     A = -np.ones((num_nodes, num_nodes))
     np.fill_diagonal(A, (num_nodes - 1))
     return A
+
+
+def kappa_matrix(G):
+    tt_func = nx.get_edge_attributes(G, "tt_function")
+    alpha = np.array([tt_func[e](1) - tt_func[e](0) for e in G.edges()])
+    kappa = 1 / alpha
+    return np.diag(kappa)
+
+
+def gamma_matrix(G):
+    tt_func = nx.get_edge_attributes(G, "tt_function")
+    beta = np.array([tt_func[e](0) for e in G.edges()])
+    alpha = np.array([tt_func[e](1) - tt_func[e](0) for e in G.edges()])
+    alpha_dict = dict(zip(G.edges, alpha))
+    beta_dict = dict(zip(G.edges, beta))
+
+    Gamma = np.zeros((G.number_of_nodes(), G.number_of_nodes()))
+    for e in G.edges:
+        i, j = e
+        a = alpha_dict[e]
+        b = beta_dict[e]
+        gamma = b / a
+        Gamma[i, j] += gamma
+        # Gamma[j, i] -= gamma
+    return Gamma
+
+
+def gamma_vector(G):
+    tt_func = nx.get_edge_attributes(G, "tt_function")
+    beta = np.array([tt_func[e](0) for e in G.edges()])
+    alpha = np.array([tt_func[e](1) - tt_func[e](0) for e in G.edges()])
+    alpha_dict = dict(zip(G.edges, alpha))
+    beta_dict = dict(zip(G.edges, beta))
+
+    gamma = np.zeros(G.number_of_edges())
+    for k, e in enumerate(G.edges):
+        a = alpha_dict[e]
+        b = beta_dict[e]
+        gamma[k] += b / a
+    return gamma
 
 
 # %%
@@ -289,4 +332,6 @@ if __name__ == "__main__":
     # %%
 
     f
+# %%
+
 # %%

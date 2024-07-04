@@ -83,11 +83,11 @@ def cycle_basis(G):
     if nx.is_directed(G):
         U = G.to_undirected()
         cycle_basis = nx.minimum_cycle_basis(U)
-        extra_cycles = []
-        for u, v in U.edges():
-            if G.has_edge(v, u) and G.has_edge(u, v):
-                extra_cycles.append([u, v])
-        cycle_basis.extend(extra_cycles)
+        # extra_cycles = []
+        # for u, v in U.edges():
+        #    if G.has_edge(v, u) and G.has_edge(u, v):
+        #        extra_cycles.append([u, v])
+        # cycle_basis.extend(extra_cycles)
     else:
         U = G
         cycle_basis = nx.minimum_cycle_basis(U)
