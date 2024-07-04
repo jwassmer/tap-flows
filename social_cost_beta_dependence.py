@@ -11,64 +11,9 @@ import seaborn as sns
 from src import TAPOptimization as tap
 from src import Plotting as pl
 from sklearn.linear_model import LinearRegression
+from src import SocialCost as sc
 
 pl.mpl_params(fontsize=14)
-
-
-def braessGraph():
-    G = nx.DiGraph()
-
-    a, b, c, d = 0, 1, 2, 3
-
-    G.add_nodes_from(
-        [
-            (a, {"pos": (0, 0.5)}),
-            (b, {"pos": (0.5, 1)}),
-            (c, {"pos": (0.5, 0)}),
-            (d, {"pos": (1, 0.5)}),
-        ]
-    )
-
-    G.add_edges_from(
-        [
-            (a, b, {"tt_function": lambda n: n / 100 + 10}),
-            (b, d, {"tt_function": lambda n: n / 1000 + 25}),
-            (a, c, {"tt_function": lambda n: n / 1000 + 25}),
-            (c, d, {"tt_function": lambda n: n / 100 + 10}),
-            (b, c, {"tt_function": lambda n: n / 1000 + 1}),
-        ]
-    )
-
-    # G = updateEdgeWeights(G)
-    nx.set_edge_attributes(G, "black", "color")
-    nx.set_node_attributes(G, "lightgrey", "color")
-
-    return G
-
-
-def social_cost_e(G, f):
-    f = np.array(f)
-    tt_f = nx.get_edge_attributes(G, "tt_function")
-    beta = np.array([tt_f[e](0) for e in G.edges()])
-    alpha = np.array([tt_f[e](1) - tt_f[e](0) for e in G.edges()])
-    return alpha * f**2 + beta * f
-
-
-def slope_social_cost(G, P, edge):
-    a, b = edge
-    edge_idx = list(G.edges).index(edge)
-    E = -nx.incidence_matrix(G, oriented=True).toarray()
-    P = np.array(P)
-
-    alpha_arr = np.array(
-        [G.edges[e]["tt_function"](1) - G.edges[e]["tt_function"](0) for e in G.edges()]
-    )
-
-    L = E @ np.diag(1 / alpha_arr) @ E.T
-    Linv = np.linalg.pinv(L)
-
-    slope = (Linv[a, :] - Linv[b, :]) @ P / alpha_arr[edge_idx]
-    return slope
 
 
 # %%
@@ -90,7 +35,7 @@ source = 15
 P[source] = load
 targets = [16]  # np.delete(np.arange(G.number_of_nodes()), source)
 P[targets] = -load / len(targets)
-
+# %%
 
 f_ue = tap.user_equilibrium(G, P, positive_constraint=True)
 f_, lamb_ue = tap.linearTAP(G, P)
@@ -100,7 +45,7 @@ pl.graphPlotCC(G, cc=f_ue)  # , edge_labels=dict(zip(G.edges, f_ue)))
 
 slopes = {}
 for e in G.edges():
-    s = slope_social_cost(G, P, e)
+    s = sc.slope_social_cost(G, P, e)
     slopes[e] = s
 slopes
 
@@ -189,33 +134,6 @@ fig.show()
 # %%
 
 
-def social_cost(G, alpha, beta, P):
-    load = np.max(P)
-    num_nodes = G.number_of_nodes()
-    E = -nx.incidence_matrix(G, oriented=True).toarray()
-
-    L = E @ np.diag(1 / alpha) @ E.T
-    nx.set_edge_attributes(G, dict(zip(G.edges, beta / alpha)), "gamma")
-    A = nx.adjacency_matrix(G, weight="gamma")
-    Gamma = A - A.T
-
-    lamb_ue = np.linalg.pinv(L) @ (P + Gamma @ np.ones(num_nodes))
-
-    alpha_d = dict(zip(G.edges, alpha))
-    beta_d = dict(zip(G.edges, beta))
-    lamb_d = dict(zip(G.nodes, lamb_ue))
-    sc = np.zeros((G.number_of_nodes(), G.number_of_nodes()))
-    for e in G.edges():
-        n, m = e
-
-        delta_lamb = lamb_d[n] - lamb_d[m]
-        sc[n, m] = (delta_lamb**2 - delta_lamb * beta_d[e]) / alpha_d[e]  # / load
-        # sc[n, m] = delta_lamb**2# / alpha_d[e]
-    # print(sc)
-
-    return np.sum(sc)  # / load
-
-
 tt_fs = nx.get_edge_attributes(G, "tt_function")
 alpha_arr = np.array([tt_fs[e](1) - tt_fs[e](0) for e in G.edges()])
 beta_arr = np.array([tt_fs[e](0) for e in G.edges()])
@@ -228,7 +146,7 @@ edge_idx = list(G.edges).index(edge)
 sc_beta = []
 for i, bet in enumerate(beta_e):
     beta_arr[edge_idx] = bet
-    s = social_cost(G, alpha_arr, beta_arr, P)
+    s = sc._social_cost_from_vecs(G, alpha_arr, beta_arr, P)
     sc_beta.append(s)
 
 
@@ -254,11 +172,7 @@ plt.legend()
 print("Slope:", slope)
 print("Intercept:", y_intercept)
 
-print("Slope from function:", slope_social_cost(G, P, edge))
+print("Slope from function:", sc.slope_social_cost(G, P, edge))
 
 
-# %%
-
-
-# %%
 # %%
