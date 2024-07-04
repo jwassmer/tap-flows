@@ -47,7 +47,7 @@ def boundary_nodes_with_pop(G, buffer_metre=10_000):
 
     vor = og.compute_voronoi_polys_of_nodes(nodes[nodes["boundary"]], mask=buffered_gdf)
     vor["voronoi"] = vor["voronoi"].apply(
-        lambda x: x.difference(hull_gdf.geometry.union_all())
+        lambda x: x.difference(hull_gdf.geometry.unary_union)
     )
 
     clipped_ghs = ghs_city(buffered_gdf)

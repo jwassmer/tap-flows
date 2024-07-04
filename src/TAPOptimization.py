@@ -12,19 +12,21 @@ from src import Plotting as pl
 
 
 def social_cost(G, F):
-    tt_f = nx.get_edge_attributes(G, "tt_function")
-    alpha = np.array([tt_f[e](1) - tt_f[e](0) for e in G.edges()])
-    beta = np.array([tt_f[e](0) for e in G.edges()])
+    alpha_d = nx.get_edge_attributes(G, "alpha")
+    beta_d = nx.get_edge_attributes(G, "beta")
+    alpha_arr = np.array(list(alpha_d.values()))
+    beta_arr = np.array(list(beta_d.values()))
 
-    return np.sum(alpha @ F**2 + beta @ F)
+    return np.sum(alpha_arr @ F**2 + beta_arr @ F)
 
 
 def potential_energy(G, F):
-    tt_f = nx.get_edge_attributes(G, "tt_function")
-    alpha = np.array([tt_f[e](1) - tt_f[e](0) for e in G.edges()])
-    beta = np.array([tt_f[e](0) for e in G.edges()])
+    alpha_d = nx.get_edge_attributes(G, "alpha")
+    beta_d = nx.get_edge_attributes(G, "beta")
+    alpha_arr = np.array(list(alpha_d.values()))
+    beta_arr = np.array(list(beta_d.values()))
 
-    return np.sum(1 / 2 * alpha @ F**2 + beta @ F)
+    return np.sum(1 / 2 * alpha_arr @ F**2 + beta_arr @ F)
 
 
 def social_optimum(G, P, positive_constraint=True, **kwargs):
@@ -33,12 +35,12 @@ def social_optimum(G, P, positive_constraint=True, **kwargs):
 
     E = -nx.incidence_matrix(G, oriented=True)
 
-    tt_func = nx.get_edge_attributes(G, "tt_function")
-
     maxx = np.array(list(nx.get_edge_attributes(G, "xmax").values()))
 
-    beta_e = np.array([tt_func[e](0) for e in G.edges()])
-    alpha_e = np.array([tt_func[e](1) - tt_func[e](0) for e in G.edges()])
+    alpha_d = nx.get_edge_attributes(G, "alpha")
+    beta_d = nx.get_edge_attributes(G, "beta")
+    alpha_arr = np.array(list(alpha_d.values()))
+    beta_arr = np.array(list(beta_d.values()))
 
     # Define the variable F
     if positive_constraint:
@@ -47,7 +49,7 @@ def social_optimum(G, P, positive_constraint=True, **kwargs):
         fe = cp.Variable(num_edges)
 
     # Define the objective function
-    objective = cp.Minimize(cp.sum(alpha_e @ fe**2 + beta_e @ fe))
+    objective = cp.Minimize(cp.sum(alpha_arr @ fe**2 + beta_arr @ fe))
 
     # Define the constraints
     if len(maxx) == 0:
@@ -84,12 +86,12 @@ def user_equilibrium(G, P, positive_constraint=True, **kwargs):
 
     E = -nx.incidence_matrix(G, oriented=True)
 
-    tt_func = nx.get_edge_attributes(G, "tt_function")
-
     maxx = np.array(list(nx.get_edge_attributes(G, "xmax").values()))
 
-    beta_e = np.array([tt_func[e](0) for e in G.edges()])
-    alpha_e = np.array([tt_func[e](1) - tt_func[e](0) for e in G.edges()])
+    alpha_d = nx.get_edge_attributes(G, "alpha")
+    beta_d = nx.get_edge_attributes(G, "beta")
+    alpha_arr = np.array(list(alpha_d.values()))
+    beta_arr = np.array(list(beta_d.values()))
 
     # Define the variable F
     if positive_constraint:
@@ -98,7 +100,7 @@ def user_equilibrium(G, P, positive_constraint=True, **kwargs):
         fe = cp.Variable(num_edges)
 
     # Define the objective function
-    objective = cp.Minimize(1 / 2 * alpha_e @ fe**2 + beta_e @ fe)
+    objective = cp.Minimize(1 / 2 * alpha_arr @ fe**2 + beta_arr @ fe)
     # objective = cp.Minimize(cp.sum(list(map(lambda f: f(0), func_list))))
 
     # Define the constraints
@@ -175,7 +177,9 @@ def random_graph(
         edge: (lambda alpha, beta: lambda n: alpha * n + beta)(alpha[e], beta[e])
         for e, edge in enumerate(G.edges)
     }
-    nx.set_edge_attributes(G, tt_func, "tt_function")
+    # nx.set_edge_attributes(G, tt_func, "tt_function")
+    nx.set_edge_attributes(G, dict(zip(G.edges, alpha)), "alpha")
+    nx.set_edge_attributes(G, dict(zip(G.edges, beta)), "beta")
 
     pos = nx.spring_layout(G, seed=seed)
     nx.set_node_attributes(G, pos, "pos")
@@ -198,20 +202,27 @@ def linearTAP(G, P, social_optimum=False, **kwargs):
     P = np.array(P)
 
     num_nodes = G.number_of_nodes()
-    tt_f = nx.get_edge_attributes(G, "tt_function")
-    alpha = np.array([tt_f[e](1) - tt_f[e](0) for e in G.edges()])
-    beta = np.array([tt_f[e](0) for e in G.edges()])
+
+    alpha_d = nx.get_edge_attributes(G, "alpha")
+    beta_d = nx.get_edge_attributes(G, "beta")
+    alpha_arr = np.array(list(alpha_d.values()))
+    beta_arr = np.array(list(beta_d.values()))
 
     E = -nx.incidence_matrix(G, oriented=True)
 
-    kappa = 1 / alpha
+    kappa = 1 / alpha_arr
     nx.set_edge_attributes(G, dict(zip(G.edges, kappa)), "kappa")
     L = nx.laplacian_matrix(G, weight="kappa").toarray()
 
-    gamma = beta / alpha
+    gamma = beta_arr / alpha_arr
     nx.set_edge_attributes(G, dict(zip(G.edges, gamma)), "gamma")
     A = nx.adjacency_matrix(G, weight="gamma")
-    Gamma = A - A.T
+
+    if G.is_directed():
+        Gamma = A - A.T
+    else:
+        upper_triangle = np.triu(A.toarray())
+        Gamma = upper_triangle - upper_triangle.T
 
     if G.is_directed():
         L = E @ np.diag(kappa) @ E.T
@@ -219,7 +230,7 @@ def linearTAP(G, P, social_optimum=False, **kwargs):
     else:
         lamb = np.linalg.pinv(L) @ (1 / Q * P + Gamma @ np.ones(num_nodes))
 
-    f_alg = Q * (E.T @ lamb) / alpha - Q * beta / alpha
+    f_alg = Q * (E.T @ lamb) / alpha_arr - Q * beta_arr / alpha_arr
     # f_alg += beta * (num_nodes - 1) / alpha
     print_time = kwargs.get("print_time", False)
     if print_time:
@@ -235,18 +246,16 @@ def ODmatrix(G):
 
 
 def kappa_matrix(G):
-    tt_func = nx.get_edge_attributes(G, "tt_function")
-    alpha = np.array([tt_func[e](1) - tt_func[e](0) for e in G.edges()])
-    kappa = 1 / alpha
+    alpha_d = nx.get_edge_attributes(G, "alpha")
+    alpha_arr = np.array(list(alpha_d.values()))
+
+    kappa = 1 / alpha_arr
     return np.diag(kappa)
 
 
 def gamma_matrix(G):
-    tt_func = nx.get_edge_attributes(G, "tt_function")
-    beta = np.array([tt_func[e](0) for e in G.edges()])
-    alpha = np.array([tt_func[e](1) - tt_func[e](0) for e in G.edges()])
-    alpha_dict = dict(zip(G.edges, alpha))
-    beta_dict = dict(zip(G.edges, beta))
+    alpha_dict = nx.get_edge_attributes(G, "alpha")
+    beta_dict = nx.get_edge_attributes(G, "beta")
 
     Gamma = np.zeros((G.number_of_nodes(), G.number_of_nodes()))
     for e in G.edges:
@@ -260,11 +269,9 @@ def gamma_matrix(G):
 
 
 def gamma_vector(G):
-    tt_func = nx.get_edge_attributes(G, "tt_function")
-    beta = np.array([tt_func[e](0) for e in G.edges()])
-    alpha = np.array([tt_func[e](1) - tt_func[e](0) for e in G.edges()])
-    alpha_dict = dict(zip(G.edges, alpha))
-    beta_dict = dict(zip(G.edges, beta))
+
+    alpha_dict = nx.get_edge_attributes(G, "alpha")
+    beta_dict = nx.get_edge_attributes(G, "beta")
 
     gamma = np.zeros(G.number_of_edges())
     for k, e in enumerate(G.edges):
@@ -276,10 +283,10 @@ def gamma_vector(G):
 
 # %%
 if __name__ == "__main__":
-    num_nodes = 10
+    num_nodes = 5
     num_edges = int(num_nodes * 1.2)
-    alpha = "random"
-    beta = "random"
+    alpha = 1  # "random"
+    beta = 1  # "random"
 
     # Example graph creation
     G = random_graph(
@@ -293,7 +300,8 @@ if __name__ == "__main__":
     E = -nx.incidence_matrix(G, oriented=True).toarray()
 
     P = np.zeros(G.number_of_nodes())
-    P[0], P[1:] = 1, -1 / (num_nodes - 1)
+    load = 100
+    P[0], P[1:] = load, -load / (num_nodes - 1)
 
     F = user_equilibrium(G, P, positive_constraint=False)
     nx.set_edge_attributes(G, dict(zip(G.edges, F)), "flow")
@@ -331,7 +339,6 @@ if __name__ == "__main__":
 
     # %%
 
-    f
 # %%
 
 # %%

@@ -118,7 +118,8 @@ ax.set_title("SC = {:.0f}".format(total_social_cost(G)))
 
 # %%
 
-edge = list(G.edges(data=True))[0][-1]
+
+edge = list(G.edges(data=True))[-1][-1]
 l, m, v = edge["length"], edge["lanes"], edge["speed_kph"] / 3.6
 gamma, tr, d = 1, 2, 5
 walking_speed = 1.4
@@ -138,7 +139,7 @@ xmin = edge["xmin"]
 
 
 # Generate L values
-x_values = np.linspace(0, int(xmax * 1.2), 100)
+x_values = np.linspace(0, int(np.ceil(xmax * 1.2)), 100)
 
 t_eff_values = [eff_func(x) for x in x_values]
 linear_values = [linear_func(x) for x in x_values]

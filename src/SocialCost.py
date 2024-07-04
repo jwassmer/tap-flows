@@ -5,6 +5,37 @@ import networkx as nx
 from sklearn.linear_model import LinearRegression
 
 
+def braessGraph():
+    G = nx.DiGraph()
+
+    a, b, c, d = 0, 1, 2, 3
+
+    G.add_nodes_from(
+        [
+            (a, {"pos": (0, 0.5)}),
+            (b, {"pos": (0.5, 1)}),
+            (c, {"pos": (0.5, 0)}),
+            (d, {"pos": (1, 0.5)}),
+        ]
+    )
+
+    G.add_edges_from(
+        [
+            (a, b, {"alpha": 1 / 100, "beta": 10}),
+            (b, d, {"alpha": 1 / 1000, "beta": 25}),
+            (a, c, {"alpha": 1 / 1000, "beta": 25}),
+            (c, d, {"alpha": 1 / 100, "beta": 10}),
+            (b, c, {"alpha": 1 / 1000, "beta": 1}),
+        ]
+    )
+
+    # G = updateEdgeWeights(G)
+    nx.set_edge_attributes(G, "black", "color")
+    nx.set_node_attributes(G, "lightgrey", "color")
+
+    return G
+
+
 def _social_cost_from_vecs(G, alpha, beta, P):
     E = -nx.incidence_matrix(G, oriented=True)
     num_nodes = E.shape[0]
@@ -30,17 +61,19 @@ def total_social_cost(G, f):
 
 def social_cost_vec(G, f):
     f = np.array(f)
-    tt_f = nx.get_edge_attributes(G, "tt_function")
-    beta = np.array([tt_f[e](0) for e in G.edges()])
-    alpha = np.array([tt_f[e](1) - tt_f[e](0) for e in G.edges()])
+    alpha_d = nx.get_edge_attributes(G, "alpha")
+    alpha = np.array(list(alpha_d.values()))
+    beta_d = nx.get_edge_attributes(G, "beta")
+    beta = np.array(list(beta_d.values()))
     return alpha * f**2 + beta * f
 
 
 def social_cost_vec(G, f):
     f = np.array(f)
-    tt_f = nx.get_edge_attributes(G, "tt_function")
-    beta = np.array([tt_f[e](0) for e in G.edges()])
-    alpha = np.array([tt_f[e](1) - tt_f[e](0) for e in G.edges()])
+    alpha_d = nx.get_edge_attributes(G, "alpha")
+    alpha = np.array(list(alpha_d.values()))
+    beta_d = nx.get_edge_attributes(G, "beta")
+    beta = np.array(list(beta_d.values()))
     return alpha * f**2 + beta * f
 
 
@@ -50,9 +83,8 @@ def slope_social_cost(G, P, edge):
     E = -nx.incidence_matrix(G, oriented=True).toarray()
     P = np.array(P)
 
-    alpha_arr = np.array(
-        [G.edges[e]["tt_function"](1) - G.edges[e]["tt_function"](0) for e in G.edges()]
-    )
+    alpha_d = nx.get_edge_attributes(G, "alpha")
+    alpha_arr = np.array(list(alpha_d.values()))
 
     L = E @ np.diag(1 / alpha_arr) @ E.T
     Linv = np.linalg.pinv(L)
@@ -75,9 +107,10 @@ def derivative_socia_cost_ab(G, Linv, P, edge, alpha_arr):
 
 
 def linreg_slope_sc(G, P, edge):
-    tt_fs = nx.get_edge_attributes(G, "tt_function")
-    alpha_arr = np.array([tt_fs[e](1) - tt_fs[e](0) for e in G.edges()])
-    beta_arr = np.array([tt_fs[e](0) for e in G.edges()])
+    alpha_d = nx.get_edge_attributes(G, "alpha")
+    beta_d = nx.get_edge_attributes(G, "beta")
+    alpha_arr = np.array(list(alpha_d.values()))
+    beta_arr = np.array(list(beta_d.values()))
 
     beta_e = np.linspace(-1e1, 1e1, 5)
 
@@ -101,7 +134,10 @@ def linreg_slope_sc(G, P, edge):
     return m
 
 
-def all_social_cost_derivatives(G, P, alpha_arr):
+def all_social_cost_derivatives(G, P, alpha_arr=None):
+    if alpha_arr is None:
+        alpha_arr = np.array(list(nx.get_edge_attributes(G, "alpha").values()))
+
     E = -nx.incidence_matrix(G, oriented=True)
     L = E @ np.diag(1 / alpha_arr) @ E.T
     Linv = np.linalg.pinv(L)
@@ -134,9 +170,9 @@ if __name__ == "__main__":
     E = -nx.incidence_matrix(G, oriented=True).toarray()
     P = np.zeros(G.number_of_nodes())
     load = 500
-    source = 15
+    source = 0
     P[source] = load
-    targets = [16]  # np.delete(np.arange(G.number_of_nodes()), source)
+    targets = np.delete(np.arange(G.number_of_nodes()), source)
     P[targets] = -load / len(targets)
 
     f_ue = tap.user_equilibrium(G, P, positive_constraint=True)
@@ -154,10 +190,6 @@ if __name__ == "__main__":
     # %%
 
     # edge = min(slopes, key=slopes.get)
-
-    tt_fs = nx.get_edge_attributes(G, "tt_function")
-    alpha_arr = np.array([tt_fs[e](1) - tt_fs[e](0) for e in G.edges()])
-    beta_arr = np.array([tt_fs[e](0) for e in G.edges()])
 
     beta_e = np.linspace(-1e1, 1e1, 5)
 

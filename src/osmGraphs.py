@@ -1,4 +1,5 @@
 # %%
+import os
 import osmnx as ox
 import networkx as nx
 import numpy as np
@@ -129,23 +130,38 @@ def assign_nodes_to_districts(nodes, districts):
 
 def get_city_and_district_boundaries(city_name):
     # Geocode the city name to get its latitude and longitude
-    geolocator = Nominatim(user_agent="x_my_city_boundaries_app")
-    location = geolocator.geocode(city_name)
+    path = f"data/city_bounds/{city_name}"
+    try:
+        city_boundary = gpd.read_file(f"{path}/boundary.geojson")
+        districts10 = gpd.read_file(f"{path}/districts10.geojson")
+        districts9 = gpd.read_file(f"{path}/districts9.geojson")
+    except:
+        geolocator = Nominatim(user_agent="city_boundaries_app")
+        location = geolocator.geocode(city_name)
 
-    if not location:
-        return None, None
+        if not location:
+            return None, None
 
-    # Use OSMnx to get the city boundary
-    city_boundary = ox.geocode_to_gdf(city_name)
+        # Use OSMnx to get the city boundary
+        city_boundary = ox.geocode_to_gdf(city_name)
 
-    # Use OSMnx to get the city districts (administrative boundaries level 10)
-    districts10 = ox.features.features_from_place(
-        city_name, tags={"admin_level": "10"}
-    ).loc["relation", :]
+        # Use OSMnx to get the city districts (administrative boundaries level 10)
+        districts10 = ox.features.features_from_place(
+            city_name, tags={"admin_level": "10"}
+        ).loc["relation", :]
 
-    districts9 = ox.features.features_from_place(
-        city_name, tags={"admin_level": "9"}
-    ).loc["relation", :]
+        districts9 = ox.features.features_from_place(
+            city_name, tags={"admin_level": "9"}
+        ).loc["relation", :]
+
+        os.makedirs(path, exist_ok=True)
+        city_boundary["geometry"].to_file(f"{path}/boundary.geojson", driver="GeoJSON")
+        districts10[["name", "geometry"]].to_file(
+            f"{path}/districts10.geojson", driver="GeoJSON"
+        )
+        districts9[["name", "geometry"]].to_file(
+            f"{path}/districts9.geojson", driver="GeoJSON"
+        )
 
     return city_boundary, districts10, districts9
 
@@ -484,6 +500,8 @@ def osmGraph(
     heavy_boundary=False,
     **kwargs,
 ):
+    place_name = place_name.replace(" ", "")
+
     # Fetch the road network graph for the specified place
     city_boundary, districts10, districts9 = get_city_and_district_boundaries(
         place_name
@@ -526,7 +544,7 @@ def osmGraph(
 
 if __name__ == "__main__":
     # Define the place name or address
-    place_name = "Cologne, Germany"
+    place_name = "Heidelberg, Germany"
 
     G = osmGraph(place_name, heavy_boundary=True)
 

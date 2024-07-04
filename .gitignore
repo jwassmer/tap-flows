@@ -9,7 +9,7 @@ cache
 src/__pycache__
 test/__pycache__
 data/GHS
-
+data/city_bounds
 
 slurm
 

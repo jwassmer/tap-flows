@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import plotly.graph_objects as go
 import seaborn as sns
+import tqdm
 
 from src import TAPOptimization as tap
 from src import Plotting as pl
@@ -20,7 +21,6 @@ pl.mpl_params(fontsize=14)
 
 
 def interactive_mesh_plot_sc(alphas, betas, dfs):
-
     # Assuming the variables betas, alphas, and sc_df are defined as follows for demonstration:
     X, Y = np.meshgrid(betas, alphas)
     # Z = sc_ue_df.values.astype(float)
@@ -86,10 +86,10 @@ def social_cost_alpha_beta_df(
     sc_so_df = pd.DataFrame(index=alphas, columns=betas)
     sc_ue_df = pd.DataFrame(index=alphas, columns=betas)
     # sc_lap_df = pd.DataFrame(index=alphas, columns=betas)
-    for a in alphas:
+    for a in tqdm.tqdm(alphas):
         for b in betas:
-            G.edges[edge]["tt_function"] = lambda n: n * a + b
-            # G.edges[edge[::-1]]["tt_function"] = lambda n: n / a + b
+            G.edges[edge]["alpha"] = a
+            G.edges[edge]["beta"] = b
             if not positive_constraint:
                 f_ue, lamb_ue = tap.linearTAP(G, P)
                 f_so, lamb_so = tap.linearTAP(G, P, social_optimum=True)
@@ -149,14 +149,56 @@ interactive_mesh_plot_sc(alphas, betas, [sc_so_df, sc_ue_df])
 G = og.osmGraph("Potsdam,Germany")
 # %%
 nodes, edges = ox.graph_to_gdfs(G)
-alpha = np.array(edges["alpha"])
-beta = np.array(edges["beta"])
+alpha_arr = np.array(edges["alpha"])
+beta_arr = np.array(edges["beta"])
 P = og.demands(G, 3)[0]
 
-derivatives = sc.all_social_cost_derivatives(G, P, alpha)
+derivatives = sc.all_social_cost_derivatives(G, P)
+f, lamb = tap.linearTAP(G, P)
+fdict = dict(zip(G.edges, f))
 # %%
-beta
+edge = max(derivatives, key=derivatives.get)
+derivatives[edge]
+# fdict[edge]
+# %%
+x, y = edges.loc[edge]["alpha"], edges.loc[edge]["beta"]
+alphas = np.linspace(x / 2, 2 * x, 25)
+betas = np.linspace(y / 2, 2 * y, 25)
+
+# df_ue, df_so = social_cost_alpha_beta_df(G, edge, alphas, betas)
+# interactive_mesh_plot_sc(alphas, betas, [sc_so_df, sc_ue_df])
+# %%
+sc.linreg_slope_sc(G, P, edge)
 
 # %%
-derivatives
+derivatives[edge]
+# %%
+
+
+tt_fs = nx.get_edge_attributes(G, "tt_function")
+
+beta_e = np.linspace(-10, 1e1, 5)
+
+edge_idx = list(G.edges).index(edge)
+
+sc_beta = []
+for i, bet in enumerate(beta_e):
+    beta_arr[edge_idx] = bet
+    s = sc._social_cost_from_vecs(G, alpha_arr, beta_arr, P)
+    sc_beta.append(s)
+
+# Reshape the data for linear regression
+X = np.array(beta_e).reshape(-1, 1)
+y = np.array(sc_beta)
+
+# Create and fit the linear regression model
+model = LinearRegression()
+model.fit(X, y)
+# y_intercept = model.intercept_
+m = model.coef_[0]
+m
+
+# %%
+
+plt.plot(X, y)
 # %%

@@ -22,17 +22,13 @@ def price_of_anarchy(G, demands):
     Fso_dict = dict(zip(G.edges, Fso))
     Fue_dict = dict(zip(G.edges, Fue))
 
-    cost_funcs = nx.get_edge_attributes(G, "tt_function")
-    if isinstance(G, nx.MultiDiGraph):
-        so_cost = sum(
-            [Fso_dict[e] * cost_funcs[e](Fso_dict[e]) for e in G.edges(keys=True)]
-        )
-        ue_cost = sum(
-            [Fue_dict[e] * cost_funcs[e](Fue_dict[e]) for e in G.edges(keys=True)]
-        )
-    else:
-        so_cost = sum([Fso_dict[e] * cost_funcs[e](Fso_dict[e]) for e in G.edges()])
-        ue_cost = sum([Fue_dict[e] * cost_funcs[e](Fue_dict[e]) for e in G.edges()])
+    # cost_funcs = nx.get_edge_attributes(G, "tt_function")
+    alpha = nx.get_edge_attributes(G, "alpha")
+    beta = nx.get_edge_attributes(G, "beta")
+    cost_funcs = {e: lambda n: alpha[e] * n + beta[e] for e in G.edges}
+
+    so_cost = sum([Fso_dict[e] * cost_funcs[e](Fso_dict[e]) for e in G.edges])
+    ue_cost = sum([Fue_dict[e] * cost_funcs[e](Fue_dict[e]) for e in G.edges])
     # print(so_cost, ue_cost)
     return ue_cost - so_cost
 
@@ -49,13 +45,11 @@ def solve_multicommodity_tap(G, demands, social_optimum=False, **kwargs):
     start_time = time.time()
     A = -nx.incidence_matrix(G, oriented=True).toarray()
 
-    tt_funcs = nx.get_edge_attributes(G, "tt_function")
-    if isinstance(G, nx.MultiDiGraph):
-        beta = np.array([tt_funcs[e](0) for e in G.edges(keys=True)])
-        alpha = np.array([tt_funcs[e](1) - tt_funcs[e](0) for e in G.edges(keys=True)])
-    else:
-        beta = np.array([tt_funcs[e](0) for e in G.edges()])
-        alpha = np.array([tt_funcs[e](1) - tt_funcs[e](0) for e in G.edges()])
+    # tt_funcs = nx.get_edge_attributes(G, "tt_function")
+    alpha_d = nx.get_edge_attributes(G, "alpha")
+    beta_d = nx.get_edge_attributes(G, "beta")
+    alpha = np.array(list(alpha_d.values()))
+    beta = np.array(list(beta_d.values()))
 
     # Number of edges
     num_edges = G.number_of_edges()
@@ -131,7 +125,8 @@ def random_graph(
         edge: (lambda alpha, beta: lambda n: alpha * n + beta)(alpha[e], beta[e])
         for e, edge in enumerate(G.edges)
     }
-    nx.set_edge_attributes(G, tt_func, "tt_function")
+    nx.set_edge_attributes(G, dict(zip(G.edges, alpha)), "alpha")
+    nx.set_edge_attributes(G, dict(zip(G.edges, beta)), "beta")
 
     pos = nx.spring_layout(G, seed=seed)
     nx.set_node_attributes(G, pos, "pos")

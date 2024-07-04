@@ -71,9 +71,10 @@ def convex_optimization_kcl_tap(
     # Create the edge incidence matrix E
     E = -nx.incidence_matrix(G, oriented=True).toarray()
 
-    tt_funcs = nx.get_edge_attributes(G, "tt_function")
-    betas = np.array([tt_funcs[e](0) for e in G.edges()])
-    alphas = np.array([tt_funcs[e](1) - tt_funcs[e](0) for e in G.edges()])
+    alpha_d = nx.get_edge_attributes(G, "alpha")
+    beta_d = nx.get_edge_attributes(G, "beta")
+    beta_arr = np.array(list(beta_d.values()))
+    alpha_arr = np.array(list(alpha_d.values()))
 
     if P is None:
         P = list(nx.get_node_attributes(G, "P").values())
@@ -82,7 +83,7 @@ def convex_optimization_kcl_tap(
     f = cp.Variable(num_edges)
 
     # Objective function: minimize sum of (f_e^2 / (2 * K_e))
-    objective = cp.Minimize(alphas @ f**2 / 2 + betas @ f)
+    objective = cp.Minimize(alpha_arr @ f**2 / 2 + beta_arr @ f)
     # objective = cp.Minimize(cp.sum(cp.abs(f**3)))
 
     # Constraints: E @ f = p
@@ -126,15 +127,16 @@ def convex_optimization_TAP(G):
     delta = la.path_link_incidence_matrix(G)
     gamma = la.od_path_incidence_matrix(G)
 
-    tt_funcs = nx.get_edge_attributes(G, "tt_function")
-    betas = np.array([tt_funcs[e](0) for e in G.edges()])
-    alphas = np.array([tt_funcs[e](1) - tt_funcs[e](0) for e in G.edges()])
+    alpha_d = nx.get_edge_attributes(G, "alpha")
+    beta_d = nx.get_edge_attributes(G, "beta")
+    beta_arr = np.array(list(beta_d.values()))
+    alpha_arr = np.array(list(alpha_d.values()))
 
     f = cp.Variable(num_edges)
     h = cp.Variable(num_paths)
 
     objective = cp.Minimize(
-        cp.sum(cp.multiply(alphas, f**2) / 2 + cp.multiply(betas, f))
+        cp.sum(cp.multiply(alpha_arr, f**2) / 2 + cp.multiply(beta_arr, f))
     )
     # objective = cp.Minimize(cp.sum(f))
 
@@ -161,8 +163,6 @@ def linear_program(G):
     num_edges = G.number_of_edges()
     E = -nx.incidence_matrix(G, oriented=True)  # .toarray()
 
-    tt_funcs = nx.get_edge_attributes(G, "tt_function")
-    betas = np.array([tt_funcs[e](0) for e in G.edges()])
     weights = np.array([G[u][v]["weight"] for u, v in G.edges()])
     bounds = np.array([(0, None) for _ in range(num_edges)])
 
