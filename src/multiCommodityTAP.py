@@ -43,7 +43,7 @@ def solve_multicommodity_tap(G, demands, social_optimum=False, **kwargs):
         demands: list - the demands for each commodity
     """
     start_time = time.time()
-    A = -nx.incidence_matrix(G, oriented=True).toarray()
+    A = -nx.incidence_matrix(G, oriented=True)  # .toarray()
 
     # tt_funcs = nx.get_edge_attributes(G, "tt_function")
     alpha_d = nx.get_edge_attributes(G, "alpha")

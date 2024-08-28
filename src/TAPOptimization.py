@@ -29,109 +29,88 @@ def potential_energy(G, F):
     return np.sum(1 / 2 * alpha_arr @ F**2 + beta_arr @ F)
 
 
-def social_optimum(G, P, positive_constraint=True, **kwargs):
-    num_nodes = G.number_of_nodes()
-    num_edges = G.number_of_edges()
+def optimize_tap(
+    G,
+    demands,
+    with_capacity=False,
+    social_optimum=False,
+    positive_constraint=True,
+    **kwargs
+):
+    """
+    Solves the multicommodity flow problem using CVXPY for a given graph,
+    demands, and linear cost function parameters alpha and beta.
 
-    E = -nx.incidence_matrix(G, oriented=True)
+    Parameters:
+        G: nx.DiGraph - the graph
+        demands: list - the demands for each commodity
+    """
+    start_time = time.time()
+    A = -nx.incidence_matrix(G, oriented=True)  # .toarray()
 
-    maxx = np.array(list(nx.get_edge_attributes(G, "xmax").values()))
-
+    # tt_funcs = nx.get_edge_attributes(G, "tt_function")
     alpha_d = nx.get_edge_attributes(G, "alpha")
     beta_d = nx.get_edge_attributes(G, "beta")
-    alpha_arr = np.array(list(alpha_d.values()))
-    beta_arr = np.array(list(beta_d.values()))
+    alpha = np.array(list(alpha_d.values()))
+    beta = np.array(list(beta_d.values()))
 
-    # Define the variable F
+    # Number of edges
+    num_edges = G.number_of_edges()
+
+    # Variables for the flow on each edge for each commodity
     if positive_constraint:
-        fe = cp.Variable(num_edges, nonneg=True)
-    else:
-        fe = cp.Variable(num_edges)
+        flows = cp.Variable(num_edges, nonneg=True)
+    elif not positive_constraint:
+        flows = cp.Variable(num_edges)
 
-    # Define the objective function
-    objective = cp.Minimize(cp.sum(alpha_arr @ fe**2 + beta_arr @ fe))
+    constraints = [A @ flows == demands]
 
-    # Define the constraints
-    if len(maxx) == 0:
-        constraints = [E @ fe == P]
-    else:
-        constraints = [
-            E @ fe == P,
-            cp.sum(fe, axis=1) <= maxx,
-        ]
+    if with_capacity:
+        capacity = np.array(list(nx.get_edge_attributes(G, "capacity").values()))
+        if len(capacity) > 0:
+            constraints.append(flows <= capacity)
+        else:
+            print("No " "capacity" " assigned to edges.")
 
-    # Define the problem
-    problem = cp.Problem(objective, constraints)
+    if social_optimum:
+        Q = 1
+    elif not social_optimum:
+        Q = 1 / 2
 
-    start_time = time.time()
-    # Solve the problem
-    problem.solve(
-        verbose=False, solver=cp.OSQP, eps_rel=1e-7
-    )  # print("Optimal value:", problem.value)
+    # Objective function
+    objective = cp.Minimize(
+        cp.sum(cp.multiply(Q * alpha, flows**2) + cp.multiply(beta, flows))
+    )
 
-    # ebc_linprog = np.sum(fe.value, axis=1)
-    linprog_time = time.time() - start_time
+    # Define the problem and solve it
+    prob = cp.Problem(objective, constraints)
+    # Extracting specific kwargs if provided, otherwise setting default values
+    solver = kwargs.pop("solver", cp.OSQP)
+    eps_rel = kwargs.pop("eps_rel", 1e-6)
+    prob.solve(solver=solver, eps_rel=eps_rel, **kwargs)
+
+    # Extract the flows for each commodity
+    # flows_value = [f.value for f in flows]
+    conv_time = time.time() - start_time
+
     print_time = kwargs.get("print_time", False)
     if print_time:
-        print("Time:", linprog_time, "s")
-        print("Social cost:", social_cost(G, fe.value))
-        print("Potential energy:", potential_energy(G, fe.value))
-        print("Minimum:", problem.value)
-    return fe.value
+        print("Time:", conv_time, "s")
+
+    return flows.value
+
+
+def social_optimum(G, P, positive_constraint=True, **kwargs):
+    F = optimize_tap(
+        G, P, positive_constraint=positive_constraint, social_optimum=True, **kwargs
+    )
+    return F
 
 
 def user_equilibrium(G, P, positive_constraint=True, **kwargs):
-    num_nodes = G.number_of_nodes()
-    num_edges = G.number_of_edges()
-
-    E = -nx.incidence_matrix(G, oriented=True)
-
-    maxx = np.array(list(nx.get_edge_attributes(G, "xmax").values()))
-
-    alpha_d = nx.get_edge_attributes(G, "alpha")
-    beta_d = nx.get_edge_attributes(G, "beta")
-    alpha_arr = np.array(list(alpha_d.values()))
-    beta_arr = np.array(list(beta_d.values()))
-
-    # Define the variable F
-    if positive_constraint:
-        fe = cp.Variable(num_edges, nonneg=True)
-    else:
-        fe = cp.Variable(num_edges)
-
-    # Define the objective function
-    objective = cp.Minimize(1 / 2 * alpha_arr @ fe**2 + beta_arr @ fe)
-    # objective = cp.Minimize(cp.sum(list(map(lambda f: f(0), func_list))))
-
-    # Define the constraints
-    if len(maxx) == 0:
-        # maxx = np.array([np.inf for e in G.edges()])
-        constraints = [E @ fe == P]
-    else:
-        constraints = [
-            E @ fe == P,
-            # fe >= np.zeros((num_edges, num_nodes)),
-            cp.sum(fe, axis=1) <= maxx,
-        ]
-
-    # Define the problem
-    problem = cp.Problem(objective, constraints)
-
-    start_time = time.time()
-    # Solve the problem
-    problem.solve(verbose=False, solver=cp.OSQP, eps_rel=1e-7)
-    # print("Optimal value:", problem.value)
-
-    # ebc_linprog = np.sum(fe.value, axis=1)
-    linprog_time = time.time() - start_time
-    F = fe.value
-
-    print_time = kwargs.get("print_time", False)
-    if print_time:
-        print("Time:", linprog_time, "s")
-        print("Social cost:", social_cost(G, F))
-        print("Potential energy:", potential_energy(G, F))
-        print("Minimum:", problem.value)
+    F = optimize_tap(
+        G, P, positive_constraint=positive_constraint, social_optimum=False, **kwargs
+    )
     return F
 
 
@@ -173,10 +152,6 @@ def random_graph(
         np.random.seed(seed)
         beta = 100 * np.random.rand(G.number_of_edges())
 
-    tt_func = {
-        edge: (lambda alpha, beta: lambda n: alpha * n + beta)(alpha[e], beta[e])
-        for e, edge in enumerate(G.edges)
-    }
     # nx.set_edge_attributes(G, tt_func, "tt_function")
     nx.set_edge_attributes(G, dict(zip(G.edges, alpha)), "alpha")
     nx.set_edge_attributes(G, dict(zip(G.edges, beta)), "beta")

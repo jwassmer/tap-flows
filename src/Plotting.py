@@ -74,99 +74,17 @@ def mpl_params(fontsize=20):
     mpl.rcParams.update(pgf_with_latex)
 
 
-def graphPlot(graph, ax=None):
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(6, 4))
-
-    tt_func = nx.get_edge_attributes(graph, "tt_function")
-    weights = nx.get_edge_attributes(graph, "weight")
-    pos = nx.get_node_attributes(graph, "pos")
-    loads = nx.get_edge_attributes(graph, "load")
-    flows = nx.get_edge_attributes(graph, "flow")
-
-    edge_colors = nx.get_edge_attributes(graph, "color")
-    node_colors = nx.get_node_attributes(graph, "color")
-
-    edge_labels = {e: "" for e in graph.edges()}
-
-    if len(tt_func) > 0:
-        for e, f in tt_func.items():
-            beta = int(tt_func[e](0))
-            alpha = round(tt_func[e](1) - beta, 2)
-            Kij = int(weights[e])
-            edge_labels[e] += (
-                rf"$\alpha={alpha}$, $\beta={beta}$," + "\n" + rf"$K={Kij}$" + "\n"
-            )
-
-    if len(loads) > 0 and len(flows) > 0:
-        loads = {k: round(v, 3) for k, v in loads.items()}
-        flows = {k: round(v, 3) for k, v in flows.items()}
-        for e, l in loads.items():
-            edge_labels[e] += rf"$x$={l}" + "\n" + rf"F={flows[e]}"
-    elif len(flows) > 0:
-        flows = {k: round(v, 3) for k, v in flows.items()}
-        for e, f in flows.items():
-            edge_labels[e] += rf"F={f}"
-
-    nx.draw_networkx_nodes(graph, pos, ax=ax, node_color=node_colors.values())
-    nx.draw_networkx_labels(graph, pos, ax=ax)
-
-    for u, v in graph.edges():
-        if (v, u) in graph.edges():
-            # Draw with curvature if bidirectional
-            nx.draw_networkx_edges(
-                graph,
-                pos,
-                ax=ax,
-                edgelist=[(u, v)],
-                connectionstyle="arc3,rad=0.1",
-                edge_color=edge_colors[(u, v)],
-                width=2,
-            )
-            sublabels = {(u, v): edge_labels[(u, v)]}
-            nx.draw_networkx_edge_labels(
-                graph,
-                pos,
-                ax=ax,
-                edge_labels=sublabels,
-                connectionstyle="arc3,rad=0.2",
-                font_size=12,
-            )
-
-        else:
-            # Draw straight lines if not bidirectional
-            sublabels = {(u, v): edge_labels[(u, v)]}
-            nx.draw_networkx_edges(
-                graph,
-                pos,
-                ax=ax,
-                edgelist=[(u, v)],
-                connectionstyle="arc3,rad=0",
-                edge_color=edge_colors[(u, v)],
-                width=2,
-            )
-            nx.draw_networkx_edge_labels(
-                graph,
-                pos,
-                ax=ax,
-                edge_labels=sublabels,
-                connectionstyle="arc3,rad=0",
-                font_size=12,
-            )
-
-    try:
-        sc = int(round(eq.total_social_cost(graph, "flow")))
-        ax.set_title(f"Social Cost: {sc}", fontsize=12)
-    except:
-        pass
-
-    ax.axis("off")
-
-    return ax
-
-
-def graphPlotCC(
-    graph, ax=None, cc="flow", nc=None, norm="Normalize", edge_labels=None, cbar=True
+def graphPlot(
+    graph,
+    ax=None,
+    ec=None,
+    nc=None,
+    norm="Normalize",
+    cmap=plt.get_cmap("cividis"),
+    edge_labels=None,
+    cbar=True,
+    show_labels=False,
+    title="default",
 ):
     if ax is None:
         fig, ax = plt.subplots(figsize=(6, 4))
@@ -174,20 +92,24 @@ def graphPlotCC(
     # tt_func = nx.get_edge_attributes(graph, "tt_function")
     # weights = nx.get_edge_attributes(graph, "weight")
     pos = nx.get_node_attributes(graph, "pos")
-    if isinstance(cc, str):
-        flows = nx.get_edge_attributes(graph, cc)
-    elif isinstance(cc, list):
-        flows = dict(zip(graph.edges(), cc))
-    elif isinstance(cc, np.ndarray):
-        flows = dict(zip(graph.edges(), cc))
-    elif isinstance(cc, dict):
-        flows = cc
+
+    if ec is None:
+        ec = np.ones(graph.number_of_edges())
+
+    if isinstance(ec, str):
+        flows = nx.get_edge_attributes(graph, ec)
+    elif isinstance(ec, list):
+        flows = dict(zip(graph.edges(), ec))
+    elif isinstance(ec, np.ndarray):
+        flows = dict(zip(graph.edges(), ec))
+    elif isinstance(ec, dict):
+        flows = ec
     # elif cc
 
     vmax = max(flows.values())
     vmin = min(flows.values())
     if norm == "Normalize":
-        cmap = plt.get_cmap("cividis")
+        # cmap = plt.get_cmap("cividis")
         cmap.set_under("lightgrey")
         cmap.set_bad("lightgrey")
         norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
@@ -229,7 +151,7 @@ def graphPlotCC(
     if len(node_colors) == 0:
         node_colors = {n: "lightgrey" for n in graph.nodes()}
 
-    if len(graph.nodes) < 25:
+    if len(graph.nodes) < 25 or show_labels:
         nx.draw_networkx_nodes(
             graph,
             pos,
@@ -239,6 +161,7 @@ def graphPlotCC(
         nx.draw_networkx_labels(graph, pos, ax=ax)
     else:
         nx.draw_networkx_nodes(graph, pos, ax=ax, node_color="lightgrey", node_size=0)
+
     for u, v in graph.edges():
         if (v, u) in graph.edges() and nx.is_directed(graph):
             # Draw with curvature if bidirectional
@@ -294,12 +217,13 @@ def graphPlotCC(
         )
         cbar.ax.set_title(r"$F_{i \rightarrow j}$")
     try:
-        sc = int(tap.social_cost(graph, np.array(list(flows.values()))))
-        ax.set_title(rf"$\sum_{{e\in E}} C(f_e)=${sc}", fontsize=12)
-        pe = int(tap.potential_energy(graph, np.array(list(flows.values()))))
-        ax.set_title(
-            ax.get_title() + "\n" + rf"$\sum_{{e\in E}} U(f_e)=${pe}", fontsize=12
-        )
+        if title == "default":
+            sc = int(tap.social_cost(graph, np.array(list(flows.values()))))
+            ax.set_title(rf"$\sum_{{e\in E}} C(f_e)=${sc}", fontsize=12)
+            pe = int(tap.potential_energy(graph, np.array(list(flows.values()))))
+            ax.set_title(
+                ax.get_title() + "\n" + rf"$\sum_{{e\in E}} U(f_e)=${pe}", fontsize=12
+            )
     except:
         pass
 
@@ -326,7 +250,7 @@ if platform != "linux":
 
         F = eq.linear_flow(g)
         Fvec = np.array(list(F.values()))
-        graphPlotCC(g, cc=Fvec, edge_labels=F)
+        graphPlot(g, cc=Fvec, edge_labels=F)
 
     mpl_params(fontsize=14)
 

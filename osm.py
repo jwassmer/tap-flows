@@ -12,6 +12,7 @@ import time
 from src import multiCommodityTAP as mc
 from src import Plotting as pl
 from src import osmGraphs as og
+from src import TAPOptimization as tap
 
 
 def source_sink_vector(G):
@@ -62,20 +63,23 @@ def total_potential_energy(G):
 
 
 # %%
-G = og.osmGraph("Potsdam,Germany")
-nodes = ox.graph_to_gdfs(G, nodes=True, edges=False)
-selected_nodes = og.select_evenly_distributed_nodes(nodes, 30)
+G = og.osmGraph("Nippes,Cologne,Germany")
+nodes, edges = ox.graph_to_gdfs(G, nodes=True, edges=True)
+selected_nodes = og.select_evenly_distributed_nodes(nodes, 516)
+
 
 # %%
-demands = og.demand_list(
-    nodes,
-    commodity=selected_nodes,
-)
+demands = og.demand_list(nodes, commodity=selected_nodes, gamma=1e-1)
+P = demands[0]
+print(max(P))
+
+f0 = tap.optimize_tap(G, P, with_capacity=False)
 
 # %%
 F = mc.solve_multicommodity_tap(
     G, demands, social_optimum=False, verbose=True, max_iter=50_000
 )
+F - f0
 # %%
 vmin = 1e2
 

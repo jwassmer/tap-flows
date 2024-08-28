@@ -476,6 +476,7 @@ def linear_function(edge, gamma=1):
     edge["alpha"] = alpha
     edge["beta"] = beta
     edge["xmax"] = xmax
+    edge["capacity"] = xmax
     edge["xmin"] = xmin
     edge["tmax"] = t_max
     edge["tmin"] = t_min

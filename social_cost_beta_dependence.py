@@ -7,7 +7,6 @@ np.set_printoptions(suppress=True, precision=3)
 import matplotlib.pyplot as plt
 import pandas as pd
 import plotly.graph_objects as go
-import seaborn as sns
 import tqdm
 
 from src import TAPOptimization as tap
@@ -81,6 +80,9 @@ def social_cost_alpha_beta_df(
     positive_constraint=False,
 ):
 
+    alpha0 = G.edges[edge]["alpha"]
+    beta0 = G.edges[edge]["beta"]
+
     alphas = alphas[alphas != 0]
 
     sc_so_df = pd.DataFrame(index=alphas, columns=betas)
@@ -90,21 +92,20 @@ def social_cost_alpha_beta_df(
         for b in betas:
             G.edges[edge]["alpha"] = a
             G.edges[edge]["beta"] = b
-            if not positive_constraint:
-                f_ue, lamb_ue = tap.linearTAP(G, P)
-                f_so, lamb_so = tap.linearTAP(G, P, social_optimum=True)
-            else:
-                f_ue = tap.user_equilibrium(
-                    G, P, positive_constraint=positive_constraint
-                )
-                f_so = tap.social_optimum(G, P, positive_constraint=positive_constraint)
+            # if not positive_constraint:
+            #    f_ue, lamb_ue = tap.linearTAP(G, P)
+            #    f_so, lamb_so = tap.linearTAP(G, P, social_optimum=True)
+            # else:
+            f_ue = tap.user_equilibrium(G, P, positive_constraint=positive_constraint)
+            f_so = tap.social_optimum(G, P, positive_constraint=positive_constraint)
             sc_so = tap.social_cost(G, f_so)
             sc_ue = tap.social_cost(G, f_ue)
             # sc_lap = tap.social_cost(G, f_lap)
             sc_ue_df.loc[a, b] = sc_ue / load
             sc_so_df.loc[a, b] = sc_so / load
             # sc_lap_df.loc[a, b] = sc_lap / load
-
+    G.edges[edge]["alpha"] = alpha0
+    G.edges[edge]["beta"] = beta0
     return sc_ue_df, sc_so_df
 
 
@@ -129,11 +130,12 @@ targets = np.delete(np.arange(G.number_of_nodes()), source)
 P[targets] = -load / len(targets)
 # %%
 
-f_ue = tap.user_equilibrium(G, P, positive_constraint=True)
+f_ue = tap.user_equilibrium(G, P, positive_constraint=False)
+
 f_, lamb_ue = tap.linearTAP(G, P)
 print(tap.social_cost(G, f_) / load)
 
-pl.graphPlotCC(G, cc=f_ue)  # , edge_labels=dict(zip(G.edges, f_ue)))
+pl.graphPlot(G, ec=f_ue)  # , edge_labels=dict(zip(G.edges, f_ue)))
 
 # %%
 edge = (19, 11)
@@ -146,59 +148,57 @@ interactive_mesh_plot_sc(alphas, betas, [sc_so_df, sc_ue_df])
 
 
 # %%
-G = og.osmGraph("Potsdam,Germany")
+G = og.osmGraph("Heidelberg,Germany")
 # %%
 nodes, edges = ox.graph_to_gdfs(G)
 alpha_arr = np.array(edges["alpha"])
 beta_arr = np.array(edges["beta"])
 P = og.demands(G, 3)[0]
 
+f_ue = tap.user_equilibrium(G, P, positive_constraint=True)
+f_ue
+# %%
+
 derivatives = sc.all_social_cost_derivatives(G, P)
 f, lamb = tap.linearTAP(G, P)
 fdict = dict(zip(G.edges, f))
+
+edges["dscdbeta"] = edges.index.map(derivatives)
+edges["flow"] = edges.index.map(fdict)
+
 # %%
-edge = max(derivatives, key=derivatives.get)
-derivatives[edge]
-# fdict[edge]
+edges["f+"] = edges["flow"] > 0
+edges["d+"] = edges["dscdbeta"] > 0
 # %%
+potential_braess_edg = edges[(edges["f+"] != edges["d+"]) & (edges["flow"] > 0)][
+    ["flow", "dscdbeta"]
+]
+
+
+# %%
+
+# edge = potential_braess_edg["flow"].idxmax()
+edge = min(derivatives, key=derivatives.get)
+print("Edge length:", edges.loc[edge]["length"])
+print("slope:", round(derivatives[edge], 2))
+
+print(
+    "Linreg equal to derivative:",
+    np.isclose(sc.linreg_slope_sc(G, P, edge), derivatives[edge]),
+)
+
+
 x, y = edges.loc[edge]["alpha"], edges.loc[edge]["beta"]
-alphas = np.linspace(x / 2, 2 * x, 25)
-betas = np.linspace(y / 2, 2 * y, 25)
+alphas = np.linspace(x * 0.5, 2 * x, 20)
+betas = np.linspace(0, 10 * y, 20)
 
-# df_ue, df_so = social_cost_alpha_beta_df(G, edge, alphas, betas)
-# interactive_mesh_plot_sc(alphas, betas, [sc_so_df, sc_ue_df])
-# %%
-sc.linreg_slope_sc(G, P, edge)
-
-# %%
-derivatives[edge]
-# %%
-
-
-tt_fs = nx.get_edge_attributes(G, "tt_function")
-
-beta_e = np.linspace(-10, 1e1, 5)
-
-edge_idx = list(G.edges).index(edge)
-
-sc_beta = []
-for i, bet in enumerate(beta_e):
-    beta_arr[edge_idx] = bet
-    s = sc._social_cost_from_vecs(G, alpha_arr, beta_arr, P)
-    sc_beta.append(s)
-
-# Reshape the data for linear regression
-X = np.array(beta_e).reshape(-1, 1)
-y = np.array(sc_beta)
-
-# Create and fit the linear regression model
-model = LinearRegression()
-model.fit(X, y)
-# y_intercept = model.intercept_
-m = model.coef_[0]
-m
+df_ue, df_so = social_cost_alpha_beta_df(
+    G, edge, alphas, betas, positive_constraint=False
+)
 
 # %%
+maxval = df_ue.max()
+interactive_mesh_plot_sc(alphas, betas, [df_so])
 
-plt.plot(X, y)
+
 # %%

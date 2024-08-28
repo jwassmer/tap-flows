@@ -89,19 +89,8 @@ def social_cost_e(G, f):
 
 
 G = braessGraph()
-# G.remove_edge(1, 2)
-# G.add_edge(2, 1, **G[1][2])
-load = 1000
-
-P = [load, -0, -0, -1000]
-demand = [P]
-
-
-tapflow = mc.solve_multicommodity_tap(G, demand, social_optimum=False)
-nx.set_edge_attributes(G, dict(zip(G.edges, tapflow)), "tapflow")
-
-pl.graphPlotCC(G, cc=tapflow, edge_labels=dict(zip(G.edges, np.round(tapflow, 2))))
-print(mc.price_of_anarchy(G, demand))
+load = 1_000
+P = [load, 0, 0, -load]
 # %%
 fig, ax = plt.subplots(1, 1, figsize=(8, 6), sharey=True)
 betas = np.linspace(-5, 20, num=100)
