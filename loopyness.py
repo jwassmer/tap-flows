@@ -14,9 +14,9 @@ from src import TAPOptimization as tap
 radius = 3
 
 flows = []
-for alpha in [0, 1e-4, 0.1, 1, 10, 1e5]:
+for alpha in [1e-2, 1e-1, 1e0, 1e1]:
 
-    H = gr.triangularLattice(radius, beta=1, alpha=alpha, directed=False)
+    H = gr.triangularLattice(radius, beta="random", alpha=alpha, directed=True)
 
     source = 0  # int((len(H) - 1) / 2)
     P = -np.ones(H.number_of_nodes())
@@ -38,7 +38,7 @@ flows.insert(0, s)
 
 # %%
 
-fig, axs = plt.subplots(len(flows), figsize=(5, 25))
+fig, axs = plt.subplots(len(flows), figsize=(5, 20))
 
 maxf = max([max(f) for f in flows])
 for i, f in enumerate(flows):
@@ -52,12 +52,12 @@ for i, f in enumerate(flows):
     )
 
 # %%
-np.max(np.abs(flows[0] - flows[1]))
-# %%
 
-fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+fig, ax = plt.subplots(1, 1, figsize=(6, 5))
 
-G = gr.triangularLattice(3, beta="random", alpha=1)
+G = gr.triangularLattice(3, beta="random", alpha=1e-3)
+# G = gr.random_graph(20, 0.2, beta="random", alpha=1e0)
+
 E = -nx.incidence_matrix(G, oriented=True)
 
 load = 1000
@@ -76,54 +76,21 @@ s = sibc._single_source_interaction_betweenness_centrality(G, weight="beta", P=P
 print(sum(f))
 print(sum(s))
 
-maxf = max(f)
+maxf = max(np.abs(f - s))
 
 cmap = plt.cm.coolwarm
-norm = mpl.colors.SymLogNorm(linthresh=1e-1, linscale=1, vmin=-maxf, vmax=maxf)
+norm = mpl.colors.SymLogNorm(linthresh=1e-2, linscale=1, vmin=-maxf, vmax=maxf)
 nc = {n: "red" if p > 0 else "lightblue" for n, p in zip(G.nodes, P)}
-pl.graphPlot(G, ec=f, norm=norm, cmap=cmap, show_labels=True, nc=nc, ax=ax)
-# %%
-
-
-D = nx.DiGraph()
-for v, e in zip(f, G.edges):
-    if v > 1e-3:
-        beta = G.edges[e]["beta"]
-        alpha = G.edges[e]["alpha"]
-        D.add_edge(*e)
-        D.edges[e]["beta"] = beta
-        D.edges[e]["alpha"] = alpha
-
-
-pos = {n: G.nodes[n]["pos"] for n in G.nodes}
-nx.set_node_attributes(D, pos, "pos")
-f0 = tap.user_equilibrium(D, P, solver=cp.SCS, eps_rel=1e-8, positive_constraint=False)
-pl.graphPlot(D, ec=f0, show_labels=True)
+pl.graphPlot(G, ec=f - s, norm=norm, cmap=cmap, show_labels=True, nc=nc, ax=ax)
 
 # %%
-
-
-betas = [0, 0.1, 0.5, 1, 2, 5, 10, 1000]
-
-flows = []
-for beta in betas:
-    D.edges[(0, 1)]["beta"] = beta
-    f0 = tap.user_equilibrium(
-        D, P, solver=cp.SCS, eps_rel=1e-8, positive_constraint=False
-    )
-    flows.append(f0)
-    print(min(f0), max(f0))
-
+C = gr.cycle_edge_incidence_matrix(G)
+deltaf = f - s
 # %%
 
+v = C @ deltaf
 
-f1_dict = {e: v for e, v in zip(G.edges, f)}
-f0_dict = {e: v for e, v in zip(D.edges, f0)}
-
-
-for k, v in f0_dict.items():
-    print(v - f1_dict[k])
-
+v.min()
 
 # %%
 

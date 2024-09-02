@@ -92,7 +92,7 @@ def _single_source_dijkstra_path_basic(G, s, weight, cutoff=None):
     for v in G:
         P[v] = []
 
-    sigma = dict.fromkeys(G, 0.0)  # sigma[v]=0 for v in G
+    sigma = dict.fromkeys(G, 0.0)
     D = {}
     sigma[s] = 1.0
     push = heappush
@@ -266,38 +266,38 @@ def _single_source_interaction_betweenness_centrality(
 
 
 # %%
+if __name__ == "__main__":
 
+    from src import TAPOptimization as tap
+    import cvxpy as cp
+    from src import Plotting as pl
+    from src import SocialCost as sc
 
-from src import TAPOptimization as tap
-import cvxpy as cp
-from src import Plotting as pl
+    G = nx.cycle_graph(6)
+    G = nx.to_directed(G)
+    G = G.copy()
+    E = -nx.incidence_matrix(G, oriented=True)
+    nx.set_edge_attributes(G, 0, "alpha")
+    nx.set_edge_attributes(G, 1, "beta")
+    G.edges[(0, 5)]["beta"] = 3
+    pos = {0: (0, 0), 1: (1, 1), 2: (2, 1), 3: (3, 1), 4: (4, 1), 5: (5, 0)}
+    nx.set_node_attributes(G, pos, "pos")
 
-# Create a graph with 5 nodes forming a ring
-G = nx.cycle_graph(6)
-G = nx.to_directed(G)
-G = G.copy()
-E = -nx.incidence_matrix(G, oriented=True)
-nx.set_edge_attributes(G, 0, "alpha")
-nx.set_edge_attributes(G, 1, "beta")
-G.edges[(0, 5)]["beta"] = 3
-pos = {0: (0, 0), 1: (1, 1), 2: (2, 1), 3: (3, 1), 4: (4, 1), 5: (5, 0)}
-nx.set_node_attributes(G, pos, "pos")
+    source = 0
+    sink = 4
+    P = np.zeros(G.number_of_nodes())
+    P[source] = 10
+    P[sink] = -10
+    # %%
 
-source = 0
-sink = 4
-P = np.zeros(G.number_of_nodes())
-P[source] = 10
-P[sink] = -10
-# %%
+    f = tap.user_equilibrium(G, P, positive_constraint=True, solver=cp.SCS)
+    s = _single_source_interaction_betweenness_centrality(G, weight="beta", P=P)
 
-f = tap.user_equilibrium(G, P, positive_constraint=True, solver=cp.SCS)
-s = _single_source_interaction_betweenness_centrality(G, weight="beta", P=P)
+    {e: np.round(v, 2) for e, v in zip(G.edges, f)}
 
-{e: np.round(v, 2) for e, v in zip(G.edges, f)}
-
-pl.graphPlot(G, ec=f, show_labels=True)
-# %%
-
-
-E @ s  # -P
-# %%
+    pl.graphPlot(G, ec=f, show_labels=True)
+    # %%
+    sc.total_social_cost(G, f)
+    # %%
+    sc.total_social_cost(G, s)
+    # %%
