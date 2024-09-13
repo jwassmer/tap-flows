@@ -11,10 +11,17 @@ import matplotlib as mpl
 
 
 def effective_beta(G, f):
+    if isinstance(f, (int, float)):
+        f = f * np.ones(len(G.edges))
+
+    if isinstance(f, list):
+        f = np.array(f)
+
+    if isinstance(f, np.ndarray):
+        f_dict = dict(zip(G.edges, f))
+
     beta = nx.get_edge_attributes(G, "beta")
     alpha = nx.get_edge_attributes(G, "alpha")
-
-    f_dict = dict(zip(G.edges, f))
 
     eff_beta = {}
 
@@ -35,7 +42,7 @@ def effective_subgraph(G, depth=5, weight="beta"):
         res_mat_new = res_mat.copy()
         for i in range(len(G)):
             for j in range(len(G)):
-                res_mat_new[i, j] = np.min(res_mat[i] + res_mat[j])
+                res_mat_new[i, j] = np.min(res_mat[i, :] + res_mat[:, j])
         res_mat = res_mat_new
 
     conenction_matrix_flow = A0.copy()
@@ -73,7 +80,7 @@ def effective_flow_solver(G, P, f0=None, depth=3):
         f0 = np.zeros(n)
 
     if isinstance(f0, (int, float)):
-        f0 = f0 * np.ones(n)
+        f0 = f0
 
     connectivity_mat = f0 * A_alpha_connectivity + A_beta_connectivity
 
@@ -82,7 +89,7 @@ def effective_flow_solver(G, P, f0=None, depth=3):
         res_mat_new = res_mat.copy()
         for i in range(n):
             for j in range(n):
-                res_mat_new[i, j] = np.min(res_mat[i] + res_mat[:, j])
+                res_mat_new[i, j] = np.min(res_mat[i, :] + res_mat[:, j])
         res_mat = res_mat_new
 
     con_flow = connectivity_mat.copy()
@@ -90,7 +97,7 @@ def effective_flow_solver(G, P, f0=None, depth=3):
     alpha_flow = A_alpha_connectivity.copy()
     for i in range(n):
         for j in range(n):
-            if res_mat[-1, i] > res_mat[-1, j]:
+            if res_mat[0, i] > res_mat[0, j]:
                 con_flow[i, j] = np.inf
                 beta_flow[i, j] = np.inf
                 alpha_flow[i, j] = np.inf
@@ -104,11 +111,16 @@ def effective_flow_solver(G, P, f0=None, depth=3):
     gamma = gamma - gamma.T
 
     lambdas = np.linalg.lstsq(L2, gamma.sum(-1) + P)[0]
-    # E = -nx.incidence_matrix(G, oriented=True).toarray()
-    # alpha_arr = np.array(list(nx.get_edge_attributes(G, "alpha").values()))
-    # beta_arr = np.array(list(nx.get_edge_attributes(G, "beta").values()))
-    # f = (E.T @ lambdas) / alpha_arr - beta_arr / alpha_arr
+
     f = 1 / alpha_flow * (lambdas[:, None] - lambdas[None, :]) - beta_flow / alpha_flow
+    f[np.isnan(f)] = 0
+
+    # subgraph = nx.from_numpy_array(f, create_using=nx.DiGraph, edge_attr="eff_flow")
+    # f_dict = nx.get_edge_attributes(subgraph, "eff_flow")
+
+    # for e in G.edges:
+    #    if e not in f_dict:
+    #        f_dict[e] = 0
 
     return lambdas[:, None], f
 
@@ -129,12 +141,20 @@ def iterative_solver(G, P):
     return Gs, f0
 
 
-def flow_subgraph(G, f):
-    Gs = G.copy()
-    f_dict = dict(zip(G.edges, f))
-    for e in G.edges:
-        if f_dict[e] < 1e-5:
-            Gs.remove_edge(*e)
+def flow_subgraph(G, feff):
+    Gs = nx.DiGraph()
+    Gs.add_nodes_from(G.nodes)
+    eps = 1e-4
+
+    for e, f in feff.items():
+        if f > eps:
+            Gs.add_edge(*e, alpha=G.edges[e]["alpha"], beta=G.edges[e]["beta"])
+        if f < -eps:
+            l = e[::-1]
+            Gs.add_edge(*l, alpha=G.edges[l]["alpha"], beta=G.edges[l]["beta"])
+
+    pos = nx.get_node_attributes(G, "pos")
+    nx.set_node_attributes(Gs, pos, "pos")
 
     return Gs
 
@@ -152,6 +172,21 @@ def potential_condition(G, lamb):
         return True
     else:
         return False
+
+
+def reverse_flow_matrix_sign(f):
+    i, j = np.where(f < 0)
+    f[i, j] = 0
+    f[j, i] = 0
+    return f
+
+
+def reverse_flow_dict(f_dict):
+    for e in f_dict:
+        if f_dict[e] < 0:
+            f_dict[e] = 0
+            f_dict[(e[1], e[0])] = 0
+    return f_dict
 
 
 # %%
@@ -184,7 +219,7 @@ for e in G.edges:
 
 # %%
 
-G = gr.triangularLattice(1, beta="random", alpha=1e0)
+G = gr.triangularLattice(2, beta="random", alpha=1e-1)
 # beta = nx.get_edge_attributes(G, "beta")
 # alpha = nx.get_edge_attributes(G, "alpha")
 # pos = nx.get_node_attributes(G, "pos")
@@ -194,39 +229,35 @@ G = gr.triangularLattice(1, beta="random", alpha=1e0)
 
 # G.edges[(31, 26)]["alpha"] = 1e-8
 P = np.zeros(G.number_of_nodes())
-source = -1
-sinks = [0]
+source = 0
+sinks = np.delete(np.arange(G.number_of_nodes()), source)
 P[source] = 6
 P[sinks] = -np.sum(P) / len(sinks)
 
-
+f0 = tap.linearTAP(G, P)
 fp = tap.user_equilibrium(G, P, positive_constraint=True)
 
 cmap = plt.cm.cividis
 cmap.set_under("lightgrey")
 cmap.set_bad("lightgrey")
 norm = mpl.colors.Normalize(vmin=1e-3, vmax=max(fp))
-pl.graphPlot(G)  # , show_labels=True, cmap=cmap, norm=norm)
+pl.graphPlot(G, ec=fp, show_labels=True, cmap=cmap, norm=norm)
 
 
 # %%
-
-
-l0, f0 = effective_flow_solver(G, P, f0=1, depth=5)
-print(f0)
-
-# l1, f1 = effective_flow_solver(G, P, f0=f0, depth=5)
-# print(f1)
-# %%
-
-f_vec = tap.user_equilibrium(G, P)
-
-f_dict = dict(zip(G.edges, f_vec))
-f_dict
+# eff_beta = effective_beta(G, 0)
+# nx.set_edge_attributes(G, eff_beta, "beta_eff")
+Geff = effective_subgraph(G, depth=5, weight="beta")
+feff0 = tap.linearTAP(Geff, P)[0]
+cmap = plt.cm.coolwarm
+norm = mpl.colors.Normalize(vmin=-max(feff0), vmax=max(feff0))
+pl.graphPlot(Geff, ec=feff0, show_labels=True, cmap=cmap, norm=norm)
 
 # %%
-beta_arr = np.array(list(nx.get_edge_attributes(G, "beta").values()))
-beta_arr
+f_eff_dict = dict(zip(G.edges, fp))
+Gs = flow_subgraph(G, f_eff_dict)
+feff, lamb_eff = tap.linearTAP(Gs, P)
+pl.graphPlot(Gs, ec=feff, show_labels=True)
 
-# %%
+
 # %%

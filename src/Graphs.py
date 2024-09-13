@@ -11,6 +11,7 @@ def random_graph(
     seed=42,
     alpha=1,
     beta=0,
+    directed=True,
 ):
     connected = False
     if num_edges < num_nodes - 1:
@@ -30,7 +31,10 @@ def random_graph(
         np.random.seed(seed)
         beta = 100 * np.random.rand(U.number_of_edges())
 
-    G = U.to_directed()
+    if directed:
+        G = U.to_directed()
+    else:
+        G = U
 
     if isinstance(alpha, (int, float)):
         alpha = alpha * np.ones(G.number_of_edges())
@@ -141,26 +145,67 @@ def is_tuple_in_array(tup, array):
     return False
 
 
-def cycle_edge_incidence_matrix(graph):
-    # Get all the cycles in the graph
-    cycles = list(simple_cycles(graph))
+def cycle_basis_directed(graph):
+    # Step 1: Convert directed graph to undirected graph
+    undirected_graph = graph.to_undirected()
 
-    # Number of edges and cycles
-    edges = list(graph.edges())
-    num_edges = len(edges)
-    num_cycles = len(cycles)
+    # Step 2: Compute cycle basis of the undirected graph
+    cycle_basis = nx.cycle_basis(undirected_graph)
 
-    # Create the incidence matrix
-    incidence_matrix = np.zeros((num_cycles, num_edges), dtype=int)
+    for e in undirected_graph.edges:
+        cycle_basis.append([e[0], e[1]])
 
-    for i, edge in enumerate(edges):
-        for j, cycle in enumerate(cycles):
-            if is_tuple_in_array(edge, cycle):
-                incidence_matrix[j, i] = 1
-            elif is_tuple_in_array((edge[1], edge[0]), cycle):
-                incidence_matrix[j, i] = -1
+    return cycle_basis
 
-    return incidence_matrix
+
+def cycle_edge_incidence_matrix(gra):
+    """Construct the edge cycle incidence matrix from a given networkx.MultiDiGraph.
+    C_{e, c} = 1, iff edge is in the oriented cycle c and -1 if the edge is in the opposite direction.
+
+    Args:
+        gra (networkx.Graph): Graph encoding the traffic network
+
+    Returns:
+        C_matrix, simple_cycles
+    """
+    # Create a list of all simple cycles
+    simple_cycles = cycle_basis_directed(gra)
+    # add multiedge cycles
+
+    # simple_cycles = nx.recursive_simple_cycles(gra)
+
+    C_matrix = np.zeros((len(gra.edges), len(simple_cycles)))
+
+    for cc, cycle in enumerate(simple_cycles):
+        for i, j in zip(cycle, cycle[1:] + cycle[:1]):
+            edge = (i, j)
+            reversed_edge = (j, i)
+
+            if edge in gra.edges:
+                edge_idx = list(gra.edges).index(edge)
+                C_matrix[edge_idx, cc] = 1
+            # if reversed_edge in gra.edges:
+            #    edge_idx = list(gra.edges).index(reversed_edge)
+            #    C_matrix[edge_idx, cc] = -1
+
+    return C_matrix, simple_cycles
+
+
+def flow_subgraph(G, f, eps=1e-4):
+    Gs = nx.DiGraph()
+    Gs.add_nodes_from(G.nodes)
+
+    for e, v in f.items():
+        if v > eps:
+            Gs.add_edge(*e, alpha=G.edges[e]["alpha"], beta=G.edges[e]["beta"])
+        if v < -eps:
+            l = e[::-1]
+            Gs.add_edge(*l, alpha=G.edges[l]["alpha"], beta=G.edges[l]["beta"])
+
+    pos = nx.get_node_attributes(G, "pos")
+    nx.set_node_attributes(Gs, pos, "pos")
+
+    return Gs
 
 
 # %%
