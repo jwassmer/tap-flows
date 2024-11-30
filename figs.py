@@ -277,31 +277,56 @@ G.add_edge(2, 1, beta=5)
 # %%
 fig, axs = plt.subplots(1, 2, figsize=(10, 4))
 
-axs[0].plot(betas, social_cost_list, color="black")
-axs[0].set_xlabel(r"$\beta_{21}$")
-axs[0].set_ylabel("Social cost")
+axs[0].plot(betas, social_cost_list, color="black", linewidth=3)
+axs[0].set_xlabel(r"edge length $\beta_{21}$", fontsize=22)
+axs[0].set_ylabel("Social cost", fontsize=22)
 axs[0].grid()
-axs[0].scatter(betas[-1], r_sc, color="red", label="Removed edge (2, 1)", marker="x")
-axs[0].legend()
+axs[0].scatter(
+    betas[-1],
+    r_sc,
+    color="red",
+    label="Removed edge (2, 1)",
+    marker="x",
+    zorder=3,
+    s=100,
+)
+axs[0].legend(fontsize=18, loc="upper right")
+
 
 nx.draw(
     G,
     nx.get_node_attributes(G, "pos"),
+    node_size=750,
+    width=2,
     with_labels=True,
     node_color=nodecolors.values(),
     font_weight="bold",
-    arrowsize=15,
+    arrowsize=18,
     ax=axs[1],
+    font_size=18,
 )
+
+
 axs[1].annotate(
     r"$\beta_{21}$",
-    xy=(0.53, 0.5),
+    xy=(0.57, 0.5),
     xycoords="axes fraction",
-    fontsize=12,
+    fontsize=22,
     ha="center",
     va="center",
 )
 
 
-fig.savefig("figs/braess_social_cost.png", dpi=300, bbox_inches="tight")
+axs[1].annotate(
+    r"x",
+    xy=(0.5, 0.5),
+    xycoords="axes fraction",
+    fontsize=40,
+    ha="center",
+    va="center",
+    color="red",
+    zorder=3,
+)
+
+fig.savefig("figs/braess_social_cost.pdf", dpi=300, bbox_inches="tight")
 # %%

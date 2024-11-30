@@ -13,13 +13,13 @@ from src import TAPOptimization as tap
 # %%
 fig, ax = plt.subplots(1, 1, figsize=(6, 5))
 
-G = gr.squareLattice(7, beta="random", alpha=1e0)
+G = gr.triangularLattice(3, beta="random", alpha="random")
 
 E = -nx.incidence_matrix(G, oriented=True)
 
 load = 1000
 
-source = 3
+source = 0
 sinks = list(G.nodes())
 sinks.remove(source)
 P = np.zeros(G.number_of_nodes())
@@ -67,5 +67,14 @@ for k, v in f0_dict.items():
 
 np.isclose(sim_arr, 0, atol=1e-4).all()
 
+
+# %%
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+pl.graphPlot(G, ec=f, norm=norm, cmap=cmap, show_labels=True, nc=nc, ax=ax1)
+pl.graphPlot(D, ec=f0, norm=norm, cmap=cmap, show_labels=True, nc=nc, ax=ax2)
+
+fig.savefig("figs/subgraphs.png", dpi=300)
 
 # %%

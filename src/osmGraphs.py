@@ -484,12 +484,14 @@ def linear_function(edge, gamma=1):
     f = lambda x: alpha * x + beta
     # f_cond = lambda x: (t_max if f(x) > t_max else t_min if f(x) < t_min else f(x))
 
-    return f
+    return alpha, beta
 
 
 def set_effective_travel_time(G, gamma=1):
     for i, j, edge in G.edges(data=True):
-        edge["tt_function"] = linear_function(edge, gamma)
+        alpha, beta = linear_function(edge, gamma)
+        edge["alpha"] = alpha
+        edge["beta"] = beta
         # edge["energy_function"] = potential_energy(edge, gamma)
     return G
 

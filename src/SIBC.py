@@ -188,6 +188,9 @@ def _interaction_betweenness_centrality(
     if od_matrix is None:
         num_nodes = len(graph)
         od_matrix = 1 * np.ones((num_nodes, num_nodes))
+    else:
+        if not np.all(od_matrix >= 0):
+            od_matrix = np.abs(od_matrix)
 
     start = time.time()
 

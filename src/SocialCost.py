@@ -54,27 +54,47 @@ def _social_cost_from_vecs(G, alpha, beta, P):
     return np.sum(sc)
 
 
-def total_social_cost(G, f):
-    sc_vec = social_cost_vec(G, f)
+def total_social_cost(G, f, **kwargs):
+    alpha = kwargs.pop("alpha", None)
+    beta = kwargs.pop("beta", None)
+    if alpha is None:
+        alpha_d = nx.get_edge_attributes(G, "alpha")
+        alpha = np.array(list(alpha_d.values()))
+    if beta is None:
+        beta_d = nx.get_edge_attributes(G, "beta")
+        beta = np.array(list(beta_d.values()))
+    sc_vec = social_cost_vec(G, f, alpha=alpha, beta=beta)
     return np.sum(sc_vec)
 
 
-def social_cost_vec(G, f):
+def social_cost_vec(G, f, alpha=None, beta=None):
+    if alpha is None:
+        alpha_d = nx.get_edge_attributes(G, "alpha")
+        alpha = np.array(list(alpha_d.values()))
+    if beta is None:
+        beta_d = nx.get_edge_attributes(G, "beta")
+        beta = np.array(list(beta_d.values()))
     f = np.array(f)
-    alpha_d = nx.get_edge_attributes(G, "alpha")
-    alpha = np.array(list(alpha_d.values()))
-    beta_d = nx.get_edge_attributes(G, "beta")
-    beta = np.array(list(beta_d.values()))
     return alpha * f**2 + beta * f
 
 
-def social_cost_vec(G, f):
-    f = np.array(f)
+def all_braess_edges(G, P):
+    E = -nx.incidence_matrix(G, oriented=True).toarray()
+    P = np.array(P)
+
     alpha_d = nx.get_edge_attributes(G, "alpha")
-    alpha = np.array(list(alpha_d.values()))
-    beta_d = nx.get_edge_attributes(G, "beta")
-    beta = np.array(list(beta_d.values()))
-    return alpha * f**2 + beta * f
+    alpha_arr = np.array(list(alpha_d.values()))
+
+    L = E @ np.diag(1 / alpha_arr) @ E.T
+    Linv = np.linalg.pinv(L)
+
+    is_braessian = {}
+
+    for edge in G.edges:
+        slope = derivative_socia_cost_ab(G, Linv, P, edge, alpha_arr)
+        is_braessian[edge] = slope
+
+    return is_braessian
 
 
 def slope_social_cost(G, P, edge):

@@ -7,6 +7,8 @@ import numpy as np
 from src import Equilibirium as eq
 from src import TAPOptimization as tap
 
+np.set_printoptions(precision=3, suppress=True)
+
 
 def set_size(width="default", fraction=1, subplots=(1, 1)):
     """Set figure dimensions to avoid scaling in LaTeX.
@@ -50,7 +52,7 @@ def mpl_params(fontsize=20):
     pgf_with_latex = {  # setup matplotlib to use latex for output
         "pgf.texsystem": "pdflatex",  # change this if using xetex or lautex
         "text.usetex": True,  # use LaTeX to write all text
-        "font.family": "serif",
+        "font.family": "sans-serif",
         "font.serif": [],  # blank entries should cause plots
         "font.sans-serif": [],  # to inherit fonts from the document
         "font.monospace": [],
@@ -85,6 +87,7 @@ def graphPlot(
     cbar=True,
     show_labels=False,
     title="default",
+    **kwargs,
 ):
     if ax is None:
         fig, ax = plt.subplots(figsize=(6, 4))
@@ -97,7 +100,7 @@ def graphPlot(
         ec = np.ones(graph.number_of_edges())
 
     if isinstance(ec, str):
-        flows = nx.get_edge_attributes(graph, ec)
+        flows = {nx.get_edge_attributes(graph, ec)}
     elif isinstance(ec, list):
         flows = dict(zip(graph.edges(), ec))
     elif isinstance(ec, np.ndarray):
@@ -153,24 +156,28 @@ def graphPlot(
 
     if len(graph.nodes) < 25 or show_labels:
         nx.draw_networkx_nodes(
-            graph,
-            pos,
-            ax=ax,
-            node_color=list(node_colors.values()),
+            graph, pos, ax=ax, node_color=list(node_colors.values()), **kwargs
         )
         nx.draw_networkx_labels(graph, pos, ax=ax)
     else:
-        nx.draw_networkx_nodes(graph, pos, ax=ax, node_color="lightgrey", node_size=0)
+        nx.draw_networkx_nodes(
+            graph, pos, ax=ax, node_color="lightgrey", node_size=0, **kwargs
+        )
 
-    for u, v in graph.edges():
-        if (v, u) in graph.edges() and nx.is_directed(graph):
+    if nx.is_directed(graph):
+        edges = graph.edges()
+        for u, v in edges:
             # Draw with curvature if bidirectional
+            if (v, u) in graph.edges():
+                connection_style = "arc3,rad=0.2"
+            else:
+                connection_style = "arc3,rad=0.0"
             nx.draw_networkx_edges(
                 graph,
                 pos,
                 ax=ax,
                 edgelist=[(u, v)],
-                connectionstyle="arc3,rad=0.1",
+                connectionstyle=connection_style,
                 edge_color=edge_colors[(u, v)],
                 width=2,
             )
@@ -181,12 +188,13 @@ def graphPlot(
                     pos,
                     ax=ax,
                     edge_labels=sublabels,
-                    connectionstyle="arc3,rad=0.2",
+                    connectionstyle=connection_style,
                     font_size=12,
+                    font_family="sans-serif",
                 )
-
-        else:
-            # Draw straight lines if not bidirectional
+    else:
+        # Draw straight lines if not bidirectional
+        for u, v in graph.edges():
             nx.draw_networkx_edges(
                 graph,
                 pos,

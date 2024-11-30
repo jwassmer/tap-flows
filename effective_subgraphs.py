@@ -2,6 +2,7 @@
 from src import Graphs as gr
 from src import TAPOptimization as tap
 from src import Plotting as pl
+from src import SIBC as sibc
 
 import networkx as nx
 import numpy as np
@@ -141,24 +142,6 @@ def iterative_solver(G, P):
     return Gs, f0
 
 
-def flow_subgraph(G, feff):
-    Gs = nx.DiGraph()
-    Gs.add_nodes_from(G.nodes)
-    eps = 1e-4
-
-    for e, f in feff.items():
-        if f > eps:
-            Gs.add_edge(*e, alpha=G.edges[e]["alpha"], beta=G.edges[e]["beta"])
-        if f < -eps:
-            l = e[::-1]
-            Gs.add_edge(*l, alpha=G.edges[l]["alpha"], beta=G.edges[l]["beta"])
-
-    pos = nx.get_node_attributes(G, "pos")
-    nx.set_node_attributes(Gs, pos, "pos")
-
-    return Gs
-
-
 def potential_condition(G, lamb):
     beta = nx.get_edge_attributes(G, "beta")
     lamb_dict = dict(zip(G.nodes, lamb))
@@ -174,90 +157,86 @@ def potential_condition(G, lamb):
         return False
 
 
-def reverse_flow_matrix_sign(f):
-    i, j = np.where(f < 0)
-    f[i, j] = 0
-    f[j, i] = 0
-    return f
+def compare_flows(f0, f1):
+    if isinstance(f0, np.ndarray):
+        return TypeError("f0 must be a dictionary")
+    if isinstance(f1, np.ndarray):
+        return TypeError("f1 must be a dictionary")
+
+    diff = {}
+    longer_dict = f0 if len(f0) > len(f1) else f1
+    for e in longer_dict:
+        if e in f0 and e in f1:
+            diff[e] = f0[e] - f1[e]
+        elif e in f0:
+            diff[e] = f0[e]
+        elif e in f1:
+            diff[e] = f1[e]
+
+    return diff
 
 
-def reverse_flow_dict(f_dict):
-    for e in f_dict:
-        if f_dict[e] < 0:
-            f_dict[e] = 0
-            f_dict[(e[1], e[0])] = 0
-    return f_dict
+def flow_subgraph(G, feff):
+    if isinstance(feff, np.ndarray):
+        feff = dict(zip(G.edges, feff))
+
+    Gs = nx.DiGraph()
+    Gs.add_nodes_from(G.nodes)
+    eps = 0
+
+    for e, f in feff.items():
+        if f > eps:
+            Gs.add_edge(*e, alpha=G.edges[e]["alpha"], beta=G.edges[e]["beta"])
+        # if f < -eps:
+        #    l = e[::-1]
+        #    Gs.add_edge(*l, alpha=G.edges[l]["alpha"], beta=G.edges[l]["beta"])
+
+    pos = nx.get_node_attributes(G, "pos")
+    nx.set_node_attributes(Gs, pos, "pos")
+
+    return Gs
 
 
 # %%
-braess_beta = np.array(
-    [
-        [0, 0.01, 50, np.inf],
-        [0.01, 0, np.inf, 50],
-        [50, 10, 0, 0.01],
-        [np.inf, 50, 0.01, 0],
-    ]
-)
-braess_alpha = np.array(
-    [[0, 10, 1, np.inf], [10, 0, np.inf, 1], [1, 1, 0, 10], [np.inf, 1, 10, 0]]
-)
-# P = np.array([-6, 0, 0, 6])
-braess_conectivity = 1 * braess_alpha + braess_beta
 
-braess_conectivity_plot = braess_conectivity.copy()
-braess_conectivity_plot[braess_conectivity_plot == np.inf] = 0
-n = braess_conectivity.shape[0]
-
-# G = gr.triangularLattice(2, beta="random", alpha=1e-1)
-G = nx.from_numpy_array(braess_conectivity_plot, create_using=nx.DiGraph)
-pos = {0: (0, 0), 1: (1, 1), 2: (2, 1), 3: (3, 0)}
-nx.set_node_attributes(G, pos, "pos")
-for e in G.edges:
-    i, j = e
-    G.edges[i, j]["alpha"] = float(braess_alpha[i, j])
-    G.edges[i, j]["beta"] = float(braess_beta[i, j])
-
-# %%
-
-G = gr.triangularLattice(2, beta="random", alpha=1e-1)
-# beta = nx.get_edge_attributes(G, "beta")
-# alpha = nx.get_edge_attributes(G, "alpha")
-# pos = nx.get_node_attributes(G, "pos")
-
-# G = gr.squareLattice(2, beta="random", alpha="random")
-# G = gr.random_graph(10, beta="random", alpha="random")
-
-# G.edges[(31, 26)]["alpha"] = 1e-8
+G = gr.triangularLattice(4, beta="random", alpha="random")
 P = np.zeros(G.number_of_nodes())
-source = 0
-sinks = np.delete(np.arange(G.number_of_nodes()), source)
-P[source] = 6
-P[sinks] = -np.sum(P) / len(sinks)
+P[0] = 1000
+P[1:] = -P[0] / (len(P) - 1)
+# P[-1] = -100
 
-f0 = tap.linearTAP(G, P)
-fp = tap.user_equilibrium(G, P, positive_constraint=True)
-
+# %%
+fue = tap.user_equilibrium(G, P, positive_constraint=True)
 cmap = plt.cm.cividis
 cmap.set_under("lightgrey")
-cmap.set_bad("lightgrey")
-norm = mpl.colors.Normalize(vmin=1e-3, vmax=max(fp))
-pl.graphPlot(G, ec=fp, show_labels=True, cmap=cmap, norm=norm)
-
+norm = mpl.colors.Normalize(vmin=1e-3, vmax=max(fue))
+pl.graphPlot(G, ec=fue, cmap=cmap, norm=norm)
 
 # %%
-# eff_beta = effective_beta(G, 0)
-# nx.set_edge_attributes(G, eff_beta, "beta_eff")
-Geff = effective_subgraph(G, depth=5, weight="beta")
-feff0 = tap.linearTAP(Geff, P)[0]
+
+T = 1e7
+Gs = G.copy()
+alpha_vec = np.array(list(nx.get_edge_attributes(Gs, "alpha").values()))
+fx = tap.linearTAP(Gs, P, alpha=T * alpha_vec)[0]
+while min(fx) < 0:
+    T /= 10
+    Gs = flow_subgraph(Gs, dict(zip(Gs.edges, fx)))
+    alpha_vec = np.array(list(nx.get_edge_attributes(Gs, "alpha").values()))
+    fx = tap.linearTAP(Gs, P, alpha=T * alpha_vec)[0]
+    print(min(fx))
+
+# fx = tap.linearTAP(Gs, P)[0]
+pl.graphPlot(Gs, ec=fx)
+
+# %%
+
+fuedict = dict(zip(G.edges, fue))
+fxdict = dict(zip(Gs.edges, fx))
+deltaf = compare_flows(fuedict, fxdict)
+
 cmap = plt.cm.coolwarm
-norm = mpl.colors.Normalize(vmin=-max(feff0), vmax=max(feff0))
-pl.graphPlot(Geff, ec=feff0, show_labels=True, cmap=cmap, norm=norm)
-
-# %%
-f_eff_dict = dict(zip(G.edges, fp))
-Gs = flow_subgraph(G, f_eff_dict)
-feff, lamb_eff = tap.linearTAP(Gs, P)
-pl.graphPlot(Gs, ec=feff, show_labels=True)
-
-
+norm = mpl.colors.TwoSlopeNorm(
+    vmin=min(deltaf.values()), vmax=max(deltaf.values()), vcenter=0
+)
+pl.graphPlot(G, ec=deltaf, cmap=cmap, norm=norm)
 # %%

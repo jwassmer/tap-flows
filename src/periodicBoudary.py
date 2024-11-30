@@ -79,7 +79,9 @@ def set_boundary_population(G, buffer_metre=10_000):
 # %%
 
 if __name__ == "__main__":
-    G, city_boundary = og.osmGraph("Cologne,Germany", return_boundary=True)
+    from src import Plotting as pl
+
+    G, city_boundary = og.osmGraph("Vienna,Austria", return_boundary=True)
 
     buffer_metre = 10_000
 
@@ -97,9 +99,30 @@ if __name__ == "__main__":
 
     # vor.plot(ax=ax, zorder=2, column="population", alpha=0.5, cmap="binary_r")
     vor.boundary.plot(ax=ax, color="white", zorder=3, linewidth=1)
-    clipped_ghs.plot(ax=ax, cmap="cividis", vmax=200, vmin=10)
+    clipped_ghs.plot(
+        ax=ax,
+        cmap="cividis",
+        vmax=200,
+        vmin=10,
+        add_colorbar=False,
+        add_labels=False,
+        rasterized=True,
+    )
+    cbar = plt.colorbar(
+        plt.cm.ScalarMappable(norm=plt.Normalize(vmin=10, vmax=200), cmap="cividis"),
+        ax=ax,
+        orientation="vertical",
+        label="Population",
+        pad=0.01,
+        shrink=0.5,
+        extend="both",
+    )
     edges.plot(ax=ax, linewidth=0.2, edgecolor="white")
     nodes[nodes["boundary"]].plot(ax=ax, markersize=10, zorder=3, color="red")
+
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    fig.savefig("figs/vienna-heavy-boundary.pdf")
 
 
 # %%

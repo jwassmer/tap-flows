@@ -94,7 +94,7 @@ def triangularLattice(radius, alpha=1, beta=0, seed=42, directed=True):
         alpha = np.random.uniform(0.1, 1, G.number_of_edges())
     if isinstance(beta, str) and beta == "random":
         np.random.seed(seed)
-        beta = np.random.normal(1, 1e-1, G.number_of_edges())
+        beta = 100 * np.random.normal(1, 1e-1, G.number_of_edges())
 
     nx.set_edge_attributes(G, dict(zip(G.edges, alpha)), "alpha")
     nx.set_edge_attributes(G, dict(zip(G.edges, beta)), "beta")
@@ -171,15 +171,14 @@ def cycle_edge_incidence_matrix(gra):
     # Create a list of all simple cycles
     simple_cycles = cycle_basis_directed(gra)
     # add multiedge cycles
-
-    # simple_cycles = nx.recursive_simple_cycles(gra)
+    # simple_cycles = nx.cycle_basis(gra.to_undirected())
 
     C_matrix = np.zeros((len(gra.edges), len(simple_cycles)))
 
     for cc, cycle in enumerate(simple_cycles):
         for i, j in zip(cycle, cycle[1:] + cycle[:1]):
             edge = (i, j)
-            reversed_edge = (j, i)
+            # reversed_edge = (j, i)
 
             if edge in gra.edges:
                 edge_idx = list(gra.edges).index(edge)
@@ -188,7 +187,63 @@ def cycle_edge_incidence_matrix(gra):
             #    edge_idx = list(gra.edges).index(reversed_edge)
             #    C_matrix[edge_idx, cc] = -1
 
+    simple_cycles = [tuple(cycle) for cycle in simple_cycles]
     return C_matrix, simple_cycles
+
+
+def cycle_edge_incidence_matrix__(G):
+    """
+    Compute the cycle edge incidence matrix C for a given directed graph G.
+
+    Parameters:
+    - G (networkx.DiGraph): A directed graph.
+
+    Returns:
+    - C (numpy.ndarray): The cycle edge incidence matrix.
+    """
+    # Get the number of edges
+    m = G.number_of_edges()
+
+    # Find a spanning tree of the graph
+    T = nx.minimum_spanning_tree(G.to_undirected())
+
+    # Identify fundamental cycles by adding back the edges not in the spanning tree
+    fundamental_cycles = []
+    remaining_edges = set(G.edges()) - set(T.edges())
+
+    # Mapping edges to their indices
+    edge_index = {edge: idx for idx, edge in enumerate(G.edges())}
+
+    for edge in remaining_edges:
+        # Add the edge back to the tree to form a cycle
+        H = T.copy()
+        H.add_edge(*edge)
+        try:
+            # Find the cycle formed by this addition
+            cycle = nx.find_cycle(H, orientation="ignore")
+            fundamental_cycles.append(cycle)
+        except nx.NetworkXNoCycle:
+            # No cycle found, continue
+            continue
+
+    # Create the cycle edge incidence matrix C
+    f = len(fundamental_cycles)  # Number of fundamental cycles
+    C = np.zeros((m, f))
+
+    # Fill the cycle edge incidence matrix C with direction handling
+    for cycle_idx, cycle in enumerate(fundamental_cycles):
+        for u, v, direction in cycle:
+            edge = (u, v) if (u, v) in edge_index else (v, u)
+            edge_pos = edge_index[edge]
+
+            # Check the direction to assign +1 or -1
+            if direction == "forward":  # Edge is in the same direction as the cycle
+                C[edge_pos, cycle_idx] = 1
+            else:  # Edge is in the opposite direction to the cycle
+                C[edge_pos, cycle_idx] = -1
+
+    fundamental_cycles = [tuple(cycle) for cycle in fundamental_cycles]
+    return C, fundamental_cycles
 
 
 def flow_subgraph(G, f, eps=1e-4):
@@ -208,10 +263,33 @@ def flow_subgraph(G, f, eps=1e-4):
     return Gs
 
 
+def potential_subgraph(G, few):
+    U = G.copy()
+
+    for i, e in enumerate(G.edges):
+        if few[i] < 1e-2:
+            U.remove_edge(*e)
+            # A[n, m] = 1
+        else:
+            U.edges[e]["flow"] = few[i]
+    return U
+
+
+def directed_laplacian(G):
+    E = nx.incidence_matrix(G, oriented=True)
+    alpha_arr = np.array(list(nx.get_edge_attributes(G, "alpha").values()))
+    L = E @ np.diag(1 / alpha_arr) @ E.T
+    return L
+
+
 # %%
 if __name__ == "__main__":
-    G = random_graph(20, 5, alpha=1, beta=3)
+    G = random_graph(10, 5, alpha=1, beta=3)
     pl.graphPlot(G)
-    C = cycle_edge_incidence_matrix(G)
-    print(C)
-    print(list(simple_cycles(G)))
+    C, cycles = cycle_edge_incidence_matrix(G)
+    E = -nx.incidence_matrix(G, oriented=True)
+    # print(C)
+    # print(list(simple_cycles(G)))
+
+    print(np.all(np.abs(E @ C < 1e-7)))
+# %%

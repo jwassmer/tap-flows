@@ -35,6 +35,7 @@ def optimize_tap(
     with_capacity=False,
     social_optimum=False,
     positive_constraint=True,
+    return_lagrange_multiplier=False,
     **kwargs
 ):
     """
@@ -49,10 +50,14 @@ def optimize_tap(
     A = -nx.incidence_matrix(G, oriented=True)  # .toarray()
 
     # tt_funcs = nx.get_edge_attributes(G, "tt_function")
-    alpha_d = nx.get_edge_attributes(G, "alpha")
-    beta_d = nx.get_edge_attributes(G, "beta")
-    alpha = np.array(list(alpha_d.values()))
-    beta = np.array(list(beta_d.values()))
+    alpha = kwargs.pop("alpha", None)
+    beta = kwargs.pop("beta", None)
+    if alpha is None:
+        alpha_d = nx.get_edge_attributes(G, "alpha")
+        alpha = np.array(list(alpha_d.values()))
+    if beta is None:
+        beta_d = nx.get_edge_attributes(G, "beta")
+        beta = np.array(list(beta_d.values()))
 
     # Number of edges
     num_edges = G.number_of_edges()
@@ -63,7 +68,8 @@ def optimize_tap(
     elif not positive_constraint:
         flows = cp.Variable(num_edges)
 
-    constraints = [A @ flows == demands]
+    demand_constraint = A @ flows == demands
+    constraints = [demand_constraint]
 
     if with_capacity:
         capacity = np.array(list(nx.get_edge_attributes(G, "capacity").values()))
@@ -93,23 +99,42 @@ def optimize_tap(
     # flows_value = [f.value for f in flows]
     conv_time = time.time() - start_time
 
+    lagrange_multipliers = demand_constraint.dual_value
+
     print_time = kwargs.get("print_time", False)
     if print_time:
         print("Time:", conv_time, "s")
 
-    return flows.value
+    if return_lagrange_multiplier:
+        return flows.value, lagrange_multipliers
+    else:
+        return flows.value
 
 
-def social_optimum(G, P, positive_constraint=True, **kwargs):
+def social_optimum(
+    G, P, positive_constraint=True, return_lagrange_multiplier=False, **kwargs
+):
     F = optimize_tap(
-        G, P, positive_constraint=positive_constraint, social_optimum=True, **kwargs
+        G,
+        P,
+        positive_constraint=positive_constraint,
+        social_optimum=True,
+        return_lagrange_multiplier=return_lagrange_multiplier,
+        **kwargs
     )
     return F
 
 
-def user_equilibrium(G, P, positive_constraint=True, **kwargs):
+def user_equilibrium(
+    G, P, positive_constraint=True, return_lagrange_multiplier=False, **kwargs
+):
     F = optimize_tap(
-        G, P, positive_constraint=positive_constraint, social_optimum=False, **kwargs
+        G,
+        P,
+        positive_constraint=positive_constraint,
+        social_optimum=False,
+        return_lagrange_multiplier=return_lagrange_multiplier,
+        **kwargs
     )
     return F
 
@@ -178,10 +203,14 @@ def linearTAP(G, P, social_optimum=False, **kwargs):
 
     num_nodes = G.number_of_nodes()
 
-    alpha_d = nx.get_edge_attributes(G, "alpha")
-    beta_d = nx.get_edge_attributes(G, "beta")
-    alpha_arr = np.array(list(alpha_d.values()))
-    beta_arr = np.array(list(beta_d.values()))
+    alpha_arr = kwargs.pop("alpha", None)
+    beta_arr = kwargs.pop("beta", None)
+    if alpha_arr is None:
+        alpha_d = nx.get_edge_attributes(G, "alpha")
+        alpha_arr = np.array(list(alpha_d.values()))
+    if beta_arr is None:
+        beta_d = nx.get_edge_attributes(G, "beta")
+        beta_arr = np.array(list(beta_d.values()))
 
     E = -nx.incidence_matrix(G, oriented=True)
 

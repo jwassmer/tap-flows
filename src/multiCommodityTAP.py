@@ -33,7 +33,9 @@ def price_of_anarchy(G, demands):
     return ue_cost - so_cost
 
 
-def solve_multicommodity_tap(G, demands, social_optimum=False, **kwargs):
+def solve_multicommodity_tap(
+    G, demands, social_optimum=False, pos_flows=True, alpha=None, beta=None, **kwargs
+):
     """
     Solves the multicommodity flow problem using CVXPY for a given graph,
     demands, and linear cost function parameters alpha and beta.
@@ -45,11 +47,13 @@ def solve_multicommodity_tap(G, demands, social_optimum=False, **kwargs):
     start_time = time.time()
     A = -nx.incidence_matrix(G, oriented=True)  # .toarray()
 
-    # tt_funcs = nx.get_edge_attributes(G, "tt_function")
-    alpha_d = nx.get_edge_attributes(G, "alpha")
-    beta_d = nx.get_edge_attributes(G, "beta")
-    alpha = np.array(list(alpha_d.values()))
-    beta = np.array(list(beta_d.values()))
+    if alpha is None:
+        alpha_d = nx.get_edge_attributes(G, "alpha")
+        alpha = np.array(list(alpha_d.values()))
+
+    if beta is None:
+        beta_d = nx.get_edge_attributes(G, "beta")
+        beta = np.array(list(beta_d.values()))
 
     # Number of edges
     num_edges = G.number_of_edges()
@@ -58,8 +62,11 @@ def solve_multicommodity_tap(G, demands, social_optimum=False, **kwargs):
     num_commodities = len(demands)
 
     # Variables for the flow on each edge for each commodity
-    flows = [cp.Variable(num_edges, nonneg=True) for _ in range(num_commodities)]
-    # flows = cp.Variable((num_commodities, num_edges))  # , nonneg=True)
+    if pos_flows:
+        flows = [cp.Variable(num_edges, nonneg=True) for _ in range(num_commodities)]
+    else:
+        flows = [cp.Variable(num_edges) for _ in range(num_commodities)]
+
     # Combine the constraints for flow conservation
     constraints = []
     for k in range(num_commodities):
@@ -79,14 +86,26 @@ def solve_multicommodity_tap(G, demands, social_optimum=False, **kwargs):
     # Define the problem and solve it
     prob = cp.Problem(objective, constraints)
     # Extracting specific kwargs if provided, otherwise setting default values
-    solver = kwargs.pop("solver", cp.OSQP)
-    eps_rel = kwargs.pop("eps_rel", 1e-6)
-    prob.solve(solver=solver, eps_rel=eps_rel, **kwargs)
+
+    return_fw = kwargs.pop("return_fw", False)
+
+    prob.solve(**kwargs)
 
     # Extract the flows for each commodity
     # flows_value = [f.value for f in flows]
-    conv_time = time.time() - start_time
-    print("Time:", conv_time, "s")
+    print_time = kwargs.pop("print_time", False)
+    if print_time:
+        conv_time = time.time() - start_time
+        print("Time:", conv_time, "s")
+
+    if return_fw:
+        fw = []
+        for k, flow in enumerate(flows):
+            fw.append(flow.value)
+
+        lambda_s = [c.dual_value for c in constraints]
+        return np.array(fw), np.array(lambda_s)
+        # return fw
 
     return total_flow.value
 
@@ -121,10 +140,6 @@ def random_graph(
     if isinstance(beta, (int, float)):
         beta = beta * np.ones(G.number_of_edges())
 
-    tt_func = {
-        edge: (lambda alpha, beta: lambda n: alpha * n + beta)(alpha[e], beta[e])
-        for e, edge in enumerate(G.edges)
-    }
     nx.set_edge_attributes(G, dict(zip(G.edges, alpha)), "alpha")
     nx.set_edge_attributes(G, dict(zip(G.edges, beta)), "beta")
 
@@ -159,7 +174,7 @@ if __name__ == "__main__":
     demands = [P0, P1]
     Fso = solve_multicommodity_tap(G, demands, social_optimum=True)
     Fue = solve_multicommodity_tap(G, demands, social_optimum=False)
-    pl.graphPlotCC(G, cc=Fue)  # , edge_labels=dict(zip(G.edges, Fue)))
+    pl.graphPlot(G, ec=Fue)  # , edge_labels=dict(zip(G.edges, Fue)))
     print(price_of_anarchy(G, demands))
     # %%
 
