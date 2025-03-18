@@ -434,51 +434,6 @@ def inverse_coupling_matrix(G, f_mat, eps=1e-1):
 
 
 def derivative_social_cost(G, f_mat, od_matrix, eps=1e-2):
-    """Compute the derivative of the social cost efficiently."""
-    start_time = time.time()
-    num_layers = len(f_mat)
-
-    p_vec = np.hstack(od_matrix)
-    f_vec = np.hstack(f_mat)
-
-    source_nodes = np.flatnonzero(p_vec > 0)
-    sink_nodes = np.flatnonzero(p_vec < 0)
-
-    kappa = inverse_coupling_matrix(G, f_mat, eps=eps)
-
-    EE = layered_edge_incidence_matrix(G, f_mat, eps=eps).tocsc()
-    LL = -EE @ kappa @ EE.T
-
-    print("Effective Laplacian shape:", LL.shape)
-
-    # Efficient masking to remove source_nodes
-    mask = np.ones(LL.shape[0], dtype=bool)
-    mask[source_nodes] = False
-
-    LL_tilde = LL[mask][:, mask]
-    EE_tilde = EE[mask, :]
-
-    # Efficient sparse inversion via linear solve (avoiding dense inversion)
-    rhs = -(EE_tilde @ kappa).tocsc()
-    D = spla.spsolve(LL_tilde.tocsc(), rhs)
-
-    # Compute slopes
-    slopes = D.T @ p_vec[sink_nodes]
-
-    pos_flow_edge_indices = np.flatnonzero(f_vec > eps)
-    full_edge_list = [edge for _ in range(num_layers) for edge in G.edges]
-
-    slope_edge_dict = {}
-    for idx, slope_value in zip(pos_flow_edge_indices, slopes):
-        edge = full_edge_list[idx]
-        slope_edge_dict[edge] = slope_edge_dict.get(edge, 0) + slope_value
-
-    print("Total computation time:", time.time() - start_time, "s")
-
-    return slope_edge_dict
-
-
-def derivative_social_cost_(G, f_mat, od_matrix, eps=1e-2):
     """ """
     start_time = time.time()
     num_layers = len(f_mat)
