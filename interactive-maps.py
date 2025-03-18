@@ -30,7 +30,7 @@ nodes, edges = ox.graph_to_gdfs(G)
 edges.explore(column="flow")
 
 # %%
-G.derivative_social_cost(num_sources=10, gamma=0.02, eps=1e-3, solver=cp.MOSEK)
+G.derivative_social_cost(num_sources=5, gamma=0.02, eps=1e-3, solver=cp.MOSEK)
 
 nodes, edges = ox.graph_to_gdfs(G)
 
