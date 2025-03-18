@@ -48,7 +48,7 @@ def set_size(width="default", fraction=1, subplots=(1, 1)):
     return (fig_width_in, fig_height_in)
 
 
-def mpl_params(fontsize=20):
+def mpl_params(fontsize=14):
     pgf_with_latex = {  # setup matplotlib to use latex for output
         "pgf.texsystem": "pdflatex",  # change this if using xetex or lautex
         "text.usetex": True,  # use LaTeX to write all text
@@ -87,6 +87,7 @@ def graphPlot(
     cbar=True,
     show_labels=False,
     title="default",
+    edgewith=2,
     **kwargs,
 ):
     if ax is None:
@@ -170,8 +171,10 @@ def graphPlot(
             # Draw with curvature if bidirectional
             if (v, u) in graph.edges():
                 connection_style = "arc3,rad=0.2"
+                label_pos = 0.5
             else:
                 connection_style = "arc3,rad=0.0"
+                label_pos = 0.45
             nx.draw_networkx_edges(
                 graph,
                 pos,
@@ -179,18 +182,19 @@ def graphPlot(
                 edgelist=[(u, v)],
                 connectionstyle=connection_style,
                 edge_color=edge_colors[(u, v)],
-                width=2,
+                width=edgewith,
             )
             if edge_labels is not None:
-                sublabels = {(u, v): np.round(edge_labels[(u, v)], 1)}
+                sublabels = {(u, v): np.round(edge_labels[(u, v)], 2)}
                 nx.draw_networkx_edge_labels(
                     graph,
                     pos,
                     ax=ax,
                     edge_labels=sublabels,
                     connectionstyle=connection_style,
-                    font_size=12,
+                    font_size=16,
                     font_family="sans-serif",
+                    label_pos=label_pos,
                 )
     else:
         # Draw straight lines if not bidirectional
@@ -202,7 +206,7 @@ def graphPlot(
                 edgelist=[(u, v)],
                 connectionstyle="arc3,rad=0.2",
                 edge_color=edge_colors[(u, v)],
-                width=2,
+                width=edgewith,
             )
             if edge_labels is not None:
                 sublabels = {(u, v): np.round(edge_labels[(u, v)], 1)}
@@ -213,6 +217,7 @@ def graphPlot(
                     edge_labels=sublabels,
                     connectionstyle="arc3,rad=0.2",
                     font_size=12,
+                    label_pos=0.45,
                 )
     if cbar:
         cbar = plt.colorbar(

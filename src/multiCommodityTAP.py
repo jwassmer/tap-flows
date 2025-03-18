@@ -6,6 +6,32 @@ import networkx as nx
 
 from src import ConvexOptimization as co
 from src import Plotting as pl
+from src import osmGraphs as og
+
+
+def solve_tap(
+    G,
+    gamma=0.1,
+    num_sources="all",
+    social_optimum=False,
+    pos_flows=True,
+    alpha=None,
+    beta=None,
+    **kwargs
+):
+    if num_sources == "all":
+        num_sources = G.number_of_nodes()
+
+    demand_list = og.demands(G, num_sources, gamma=gamma)
+
+    f = solve_multicommodity_tap(
+        G, demand_list, social_optimum, pos_flows, alpha=alpha, beta=beta, **kwargs
+    )
+    nx.set_edge_attributes(G, dict(zip(G.edges, f)), "flow")
+
+
+nx.DiGraph.flows = solve_tap
+nx.MultiDiGraph.flows = solve_tap
 
 
 def price_of_anarchy(G, demands):

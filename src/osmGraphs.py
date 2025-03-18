@@ -33,7 +33,7 @@ def demands(G, num_commodities=1, gamma=0.1):
     return demands
 
 
-def demand_list(nodes, commodity, gamma=0.1):
+def demand_list_old(nodes, commodity, gamma=0.1):
     # nodes, edges = ox.graph_to_gdfs(G)
     nodes["source_node"] = False
 
@@ -42,15 +42,48 @@ def demand_list(nodes, commodity, gamma=0.1):
     for idx, row in commodity.iterrows():
         pop_com = row["population"]
         vor_geom = row["voronoi"]
-        source_node = idx
+        source_nodes = nodes[nodes["geometry"].within(vor_geom)].index
         target_nodes = nodes[~nodes["geometry"].within(vor_geom)].index
 
         # random_com_node = np.random.choice(com_nodes)
-        nodes.loc[source_node, "source_node"] = True
+        nodes.loc[source_nodes, "source_node"] = True
 
         P = dict(zip(nodes.index, np.zeros(len(nodes))))
         # for node in com_nodes:
-        P[source_node] = pop_com * gamma  # / len(com_nodes)
+        for node in source_nodes:
+            P[node] = pop_com * gamma / len(source_nodes)
+
+        # P[random_com_node] = pop_com
+        for node in target_nodes:
+            P[node] = -pop_com * gamma / len(target_nodes)
+        # print(sum(P.values()))
+
+        demands.append(list(P.values()))
+        # print(c, pop_com)
+        tot_pop += pop_com
+    # print("Total Population:", tot_pop)
+    return demands
+
+
+def demand_list(nodes, commodity, gamma=0.1):
+    # nodes, edges = ox.graph_to_gdfs(G)
+    nodes["source_node"] = False
+
+    demands = []
+    tot_pop = 0
+    for idx, row in commodity.iterrows():
+        pop_com = row["population"]
+        source_node = row.name
+        target_nodes = nodes.index.difference([source_node])
+
+        # random_com_node = np.random.choice(com_nodes)
+        # nodes.loc[source_nodes, "source_node"] = True
+
+        P = dict(zip(nodes.index, np.zeros(len(nodes))))
+        # for node in com_nodes:
+        # for node in source_nodes:
+        P[source_node] = pop_com * gamma  # / len(source_nodes)
+
         # P[random_com_node] = pop_com
         for node in target_nodes:
             P[node] = -pop_com * gamma / len(target_nodes)
@@ -95,7 +128,7 @@ def select_evenly_distributed_nodes(nodes_gdf, N):
     # Create a new GeoDataFrame with the selected points
     selected_gdf = nodes_gdf.iloc[selected_indices]
 
-    mask = nodes_gdf.geometry.unary_union.convex_hull.buffer(1e-3)
+    mask = nodes_gdf.geometry.union_all().convex_hull.buffer(1e-3)
     voronoi_gdf = compute_voronoi_polys_of_nodes(selected_gdf, mask=mask)
 
     for i, row in voronoi_gdf.iterrows():
@@ -133,37 +166,25 @@ def get_city_and_district_boundaries(city_name):
     path = f"data/city_bounds/{city_name}"
     try:
         city_boundary = gpd.read_file(f"{path}/boundary.geojson")
-        districts10 = gpd.read_file(f"{path}/districts10.geojson")
-        districts9 = gpd.read_file(f"{path}/districts9.geojson")
+        # districts10 = gpd.read_file(f"{path}/districts10.geojson")
+        # districts9 = gpd.read_file(f"{path}/districts9.geojson")
     except:
         geolocator = Nominatim(user_agent="city_boundaries_app")
         location = geolocator.geocode(city_name)
 
         if not location:
-            return None, None
+            return None
 
         # Use OSMnx to get the city boundary
         city_boundary = ox.geocode_to_gdf(city_name)
 
         # Use OSMnx to get the city districts (administrative boundaries level 10)
-        districts10 = ox.features.features_from_place(
-            city_name, tags={"admin_level": "10"}
-        ).loc["relation", :]
-
-        districts9 = ox.features.features_from_place(
-            city_name, tags={"admin_level": "9"}
-        ).loc["relation", :]
 
         os.makedirs(path, exist_ok=True)
-        city_boundary["geometry"].to_file(f"{path}/boundary.geojson", driver="GeoJSON")
-        districts10[["name", "geometry"]].to_file(
-            f"{path}/districts10.geojson", driver="GeoJSON"
-        )
-        districts9[["name", "geometry"]].to_file(
-            f"{path}/districts9.geojson", driver="GeoJSON"
-        )
 
-    return city_boundary, districts10, districts9
+        city_boundary["geometry"].to_file(f"{path}/boundary.geojson", driver="GeoJSON")
+
+    return city_boundary
 
 
 def voronoi_finite_polygons_2d(vor, radius=None):
@@ -364,7 +385,9 @@ def population_to_graph_nodes(graph):
     nodes = ox.graph_to_gdfs(graph, edges=False)
     voronoi_nodes = raster_population_to_voronois(nodes)
 
-    nx.set_node_attributes(graph, voronoi_nodes["population"], "population")
+    nx.set_node_attributes(
+        graph, voronoi_nodes["population"], "population"
+    )  # set minimum population of 1 to every ndoe
     nx.set_node_attributes(
         graph, voronoi_nodes["population_density"], "population_density"
     )
@@ -468,7 +491,7 @@ def linear_function(edge, gamma=1):
     t_min = l / v
     xmax = (l * m) / (walking_speed * (gamma * tr + (gamma * d) / walking_speed))
     beta = t_min
-    alpha = (t_max - beta) / xmax
+    alpha = ((t_max - beta) / xmax) / 5
     # alpha = gamma * tr / m  # taylor expand
 
     xmin = (t_min - beta) / alpha
@@ -503,12 +526,10 @@ def osmGraph(
     heavy_boundary=False,
     **kwargs,
 ):
-    place_name = place_name.replace(" ", "")
+    # place_name = place_name.replace(" ", "")
 
     # Fetch the road network graph for the specified place
-    city_boundary, districts10, districts9 = get_city_and_district_boundaries(
-        place_name
-    )
+    city_boundary = get_city_and_district_boundaries(place_name)
 
     city_hull = city_boundary.geometry.convex_hull
 
@@ -522,13 +543,13 @@ def osmGraph(
     graph = population_to_graph_nodes(graph)
 
     nodes, edges = ox.graph_to_gdfs(graph)
-    districts = districts9
-    nodes = assign_nodes_to_districts(nodes, districts)
-    if nodes["district"].isnull().all():
-        districts = districts10
-        nodes = assign_nodes_to_districts(nodes, districts)
+    # districts = districts9
+    # nodes = assign_nodes_to_districts(nodes, districts)
+    # if nodes["district"].isnull().all():
+    #    districts = districts10
+    #    nodes = assign_nodes_to_districts(nodes, districts)
 
-    nodes["district"] = nodes["district"].fillna("no_district")
+    # nodes["district"] = nodes["district"].fillna("no_district")
     graph = ox.graph_from_gdfs(nodes, edges)
     graph = set_number_of_lanes(graph)
     graph = set_effective_travel_time(graph)

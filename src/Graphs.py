@@ -3,6 +3,108 @@ import networkx as nx
 import numpy as np
 from networkx.algorithms.cycles import simple_cycles
 from src import Plotting as pl
+from scipy.spatial import Delaunay
+from geopy.distance import geodesic
+
+
+def remove_parallel_edges(G):
+
+    # Create a new graph to hold unique edges
+
+    new_G = nx.MultiDiGraph()
+
+    for u, v, keys in G.edges(keys=True):
+
+        if not new_G.has_edge(u, v):
+
+            new_G.add_edge(u, v, key=keys, **G[u][v][keys])
+
+    return new_G
+
+
+def random_planar_graph(n_nodes, seed=42, alpha=1):
+    """
+    Create a Delaunay triangulation for n_nodes randomly distributed points.
+    """
+
+    np.random.seed(seed)
+    # Generate random points in 2D space
+    latitudes = np.random.uniform(
+        low=52.9, high=53.0, size=n_nodes
+    )  # Latitude range for a region like Berlin
+    longitudes = np.random.uniform(
+        low=13.9, high=14.0, size=n_nodes
+    )  # Longitude range for a region like Berlin
+
+    points = np.column_stack((longitudes, latitudes))
+
+    # Compute the Delaunay triangulation
+    tri = Delaunay(points)
+
+    # Create a graph from the triangulation
+    G = nx.MultiGraph()
+
+    for simplex in tri.simplices:
+        for i in range(3):
+            for j in range(i + 1, 3):
+                node1, node2 = simplex[i], simplex[j]
+                point1 = points[node1]
+                point2 = points[node2]
+
+                # Calculate geodesic distance between points using EPSG:4326
+                speed_kph = 50
+                beta = geodesic(
+                    (point1[1], point1[0]), (point2[1], point2[0])
+                ).meters / (speed_kph * 1000 / 3600)
+
+                G.add_edge(node1, node2, weight=beta)
+
+    # convert to multiddigraph
+    G = G.to_directed()
+    G = remove_parallel_edges(G)
+
+    # a = 2
+    # values = np.array([1, 2, 3, 4, 5]) / 2
+    # probabilities_scale_free = np.array([x**a for x in values])
+    # probabilities_scale_free = probabilities_scale_free / probabilities_scale_free.sum()
+
+    # alpha_vec = np.random.choice(values, size=len(G.edges), p=probabilities_scale_free)
+    # alpha_dict = dict(zip(G.edges, alpha_vec))
+
+    nx.set_node_attributes(G, {i: points[i] for i in range(len(points))}, "pos")
+    nx.set_node_attributes(G, {i: latitudes[i] for i in range(len(points))}, "x")
+    nx.set_node_attributes(G, {i: longitudes[i] for i in range(len(points))}, "y")
+
+    if alpha == "random":
+        np.random.seed(seed)
+        alpha = np.random.uniform(0.1, 1, G.number_of_edges())
+        nx.set_edge_attributes(G, dict(zip(G.edges, alpha)), "alpha")
+    else:
+        nx.set_edge_attributes(G, alpha, "alpha")
+
+    beta = nx.get_edge_attributes(G, "weight")
+    nx.set_edge_attributes(G, beta, "beta")
+
+    # draw population vals from agussian
+    # nx.set_node_attributes(
+    #    G, {i: np.random.normal(100, 10) for i in range(len(points))}, "population"
+    # )
+    # draw population vals from a scale free distribution
+    a = -1
+    values = np.linspace(100, 5000, num=1000)
+    probabilities_scale_free = np.array([x**a for x in values])
+    probabilities_scale_free = probabilities_scale_free / probabilities_scale_free.sum()
+    nx.set_node_attributes(
+        G,
+        {
+            i: np.random.choice(values, p=probabilities_scale_free)
+            for i in range(len(points))
+        },
+        "population",
+    )
+
+    G.graph["crs"] = "epsg:4326"
+    return G
 
 
 def random_graph(

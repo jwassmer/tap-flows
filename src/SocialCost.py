@@ -1,5 +1,8 @@
 # %%
 
+from src import Graphs as gr
+from src import Plotting as pl
+
 import numpy as np
 import networkx as nx
 from sklearn.linear_model import LinearRegression
@@ -112,13 +115,32 @@ def slope_social_cost(G, P, edge):
     return derivative_socia_cost_ab(G, Linv, P, edge, alpha_arr)
 
 
+def all_derivatives_slope_social_cost(G, P):
+    # a, b = edge
+    # edge_idx = list(G.edges).index(edge)
+    E = -nx.incidence_matrix(G, oriented=True).toarray()
+    P = np.array(P)
+
+    alpha_d = nx.get_edge_attributes(G, "alpha")
+    alpha_arr = np.array(list(alpha_d.values()))
+
+    L = E @ np.diag(1 / alpha_arr) @ E.T
+    Linv = np.linalg.pinv(L)
+
+    dsc = (E.T @ Linv @ P) / alpha_arr
+
+    dsc_dict = dict(zip(G.edges, dsc))
+
+    return dsc_dict
+
+
 def derivative_socia_cost_ab(G, Linv, P, edge, alpha_arr):
     a, b = edge[0], edge[1]
 
     a_idx = list(G.nodes).index(a)
     b_idx = list(G.nodes).index(b)
 
-    edge_idx = list(G.edges).index(edge)
+    edge_idx = list(G.edges()).index(edge)
 
     P = np.array(P)
 
@@ -177,35 +199,26 @@ if __name__ == "__main__":
 
     import matplotlib.pyplot as plt
 
-    G = tap.random_graph(
-        seed=42,
-        num_edges=25,
-        num_nodes=20,
-        alpha=1,
-        beta=10,
-    )
+    G = gr.random_planar_graph(3, seed=1)
 
     # G = braessGraph()
 
     E = -nx.incidence_matrix(G, oriented=True).toarray()
     P = np.zeros(G.number_of_nodes())
-    load = 500
+    load = 1
     source = 0
     P[source] = load
-    targets = np.delete(np.arange(G.number_of_nodes()), source)
+    targets = [-1]
     P[targets] = -load / len(targets)
 
-    f_ue = tap.user_equilibrium(G, P, positive_constraint=True)
-    f_, lamb_ue = tap.linearTAP(G, P)
-    print(tap.social_cost(G, f_) / load)
+    f_ue, lamb_ue = tap.user_equilibrium(
+        G, P, positive_constraint=True, return_lagrange_multiplier=True
+    )
+    f_, lamb_ = tap.linearTAP(G, P)
+    # print(tap.social_cost(G, f_) / load)
 
-    # pl.graphPlotCC(G, cc=f_ue)  # , edge_labels=dict(zip(G.edges, f_ue)))
-
-    slopes = {}
-    for e in G.edges():
-        s = slope_social_cost(G, P, e)
-        slopes[e] = s
-    slopes
+    slopes = all_derivatives_slope_social_cost(G, P)
+    print(slopes)
 
     # %%
 
@@ -218,5 +231,22 @@ if __name__ == "__main__":
         m = linreg_slope_sc(G, P, edge)
 
         print(np.isclose(m, slope))
+
+    # %%
+
+    E = -nx.incidence_matrix(G, oriented=True).toarray()
+    alpha = np.array(list(nx.get_edge_attributes(G, "alpha").values()))
+    beta = np.array(list(nx.get_edge_attributes(G, "beta").values()))
+    L = E @ np.diag(1 / alpha) @ E.T
+
+    E @ (beta / alpha)
+
+    Linv = np.linalg.pinv(L)
+
+    # %%
+    dscdbeta = np.round(E.T @ Linv @ P, 3)
+
+    # %%
+
 
 # %%
