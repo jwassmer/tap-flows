@@ -199,7 +199,7 @@ if __name__ == "__main__":
 
     import matplotlib.pyplot as plt
 
-    G = gr.random_planar_graph(3, seed=1)
+    G = gr.random_planar_graph(10, seed=1)
 
     # G = braessGraph()
 

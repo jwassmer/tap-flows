@@ -105,7 +105,7 @@ cbar = plt.colorbar(
     aspect=20,
 )
 
-cbar.ax.set_xlabel(r"Cost gradient $\frac{d}{d\beta_e}SC(\mathbf{\beta_e})$")
+cbar.ax.set_xlabel(r"SCGC $\frac{\partial}{\partial\beta_e}sc(\mathbf{\beta_e})$")
 
 for i, e in enumerate(G.edges):
     if i < 4:  # First four edges in rows 0 and 3
@@ -143,7 +143,7 @@ for i, e in enumerate(G.edges):
         marker=".",
         markersize=10,
         linewidth=2.5,
-        label=rf"$ \frac{{d}}{{d\beta_e}}SC(\mathbf{{\beta_e}})$ = {slope:.2f}",
+        label=rf"$ \frac{{\partial}}{{\partial\beta_e}}sc(\mathbf{{\beta_e}})$ = {slope:.2f}",
     )
 
     ax.legend(loc="upper right")
@@ -160,7 +160,9 @@ for i, e in enumerate(G.edges):
 
 #
 
-fig.text(2 / 3 + 0.04, 0.05, r"Edge length $\beta_e$", ha="center", va="center")
+fig.text(
+    2 / 3 + 0.04, 0.05, r"Free flow travel time $\beta_e$", ha="center", va="center"
+)
 fig.text(
     1 / 3 + 0.02, 0.5, r"Social cost", ha="center", va="center", rotation="vertical"
 )

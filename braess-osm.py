@@ -93,7 +93,7 @@ cbar = plt.colorbar(sm, ax=ax, extend="both", pad=0.0, shrink=1 / 2)
 
 # %%
 
-location = "Potsdam, Germany"
+location = "Nippes, Cologne, Germany"
 
 G, bounds = og.osmGraph(location, return_boundary=True)
 # nodes.set_geometry("voronoi", inplace=True)
@@ -190,25 +190,6 @@ for i, ax in enumerate(axs):
         fontweight="bold",
     )
 
-    # inset_ax = inset_axes(ax, width="30%", height="30%", loc="upper right", borderpad=0)
-    # inset_ax.axis("off")
-    # norm_flow = edges["flow"] / edges["flow"].max()
-    # norm_derivative = (
-    #    edges["derivative_social_cost"] / edges["derivative_social_cost"].max()
-    # )
-    # diff = np.abs(norm_flow - norm_derivative)
-    # var = np.var(diff)
-    # inset_ax.scatter(
-    #    norm_flow,
-    #    norm_derivative,
-    #    marker="o",
-    #    edgecolors="black",
-    #    color="lightgrey",
-    #    label=f"$\sigma= {var:.1e}$",
-    # )
-    # inset_ax.set_xlabel(r"Traffic Flow $\|f_e\|$")
-    # inset_ax.set_ylabel(r"Sensitivity $\|\partial_{\beta_e} \mathrm{sc}_e\|$")
-
 
 cbar = plt.colorbar(
     plt.cm.ScalarMappable(cmap=cmap, norm=norm),
@@ -219,7 +200,7 @@ cbar = plt.colorbar(
     aspect=40,
 )
 
-cbar.ax.set_ylabel(r"Sensitivity $\partial_{\beta_e} \mathrm{sc}_e$")
+cbar.ax.set_ylabel(r"SCGC $\partial_{\beta_e} sc$")
 
 red_patch = Patch(color="#0571b0", label="Braess Edges")
 source_marker = Line2D(
@@ -265,7 +246,7 @@ for i, ax in enumerate(axs.flatten()):
     )
     ax.set_title(r"Traffic Volume $\gamma = $" + f"{gamma_list[i]:.2f}")
     ax.set_xlabel(r"Traffic Flow $\|f_e\|$")
-    ax.set_ylabel(r"Sensitivity $\|\partial_{\beta_e} \mathrm{sc}_e\|$")
+    ax.set_ylabel(r"SCGC $\|\partial_{\beta_e} \mathrm{sc}_e\|$")
     ax.legend()
     ax.grid()
     ax.text(

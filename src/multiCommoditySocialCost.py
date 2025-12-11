@@ -10,6 +10,7 @@ import time
 import cvxpy as cp
 from scipy.linalg import block_diag
 from scipy.linalg import null_space
+from sksparse.cholmod import cholesky
 
 # from scipy.sparse.linalg import spsolve
 import scipy.sparse.linalg as spla
@@ -17,10 +18,12 @@ import scipy.sparse.linalg as spla
 
 from src import SocialCost as sc
 import warnings
-from tqdm import tqdm
+
+import tqdm
 import osmnx as ox
 from scipy.sparse import csr_matrix, block_diag, bmat, diags, eye, lil_matrix
-from memory_profiler import memory_usage
+
+# from memory_profiler import memory_usage
 from types import MethodType
 
 np.set_printoptions(precision=3, suppress=True)
@@ -106,7 +109,45 @@ def sub_incidence_matrix(G, few, eps=1e-1):
     return E.tocsr()  # Convert to CSR format for efficient operations
 
 
-def generate_coupling_matrix(G, f_mat, eps=1e-1):
+def generate_coupling_matrix(G, edge_mask):
+    """
+    Generate the D1 matrix for a given number of sources and edges.
+
+    Parameters:
+        G (networkx.Graph): The graph with edge attribute "alpha".
+        edge_mask (np.ndarray): The flat edge mask whitch excludes edges with no flows
+
+    Returns:
+        scipy.sparse.csr_matrix: The resulting sparse D1 matrix.
+    """
+    # Extract alpha values from the graph's edges
+    alpha = np.array(list(nx.get_edge_attributes(G, "alpha").values()))
+    num_sources = len(f_mat)  # Number of sources (N)
+
+    # Create a sparse diagonal matrix for alpha
+    alpha_diag = diags(alpha, format="csr")
+
+    # Construct the full block matrix as a sparse grid
+    D1_blocks = [[alpha_diag for j in range(num_sources)] for i in range(num_sources)]
+    D1 = bmat(D1_blocks, format="csr")
+
+    return D1[edge_mask][:, edge_mask]
+
+
+def inverse_coupling_matrix(G, stacked_edge_mask, delta=1e-2):
+    """
+    Create the inverse matrix of the K block in the original problem.
+
+    Parameters:
+        G (networkx.Graph): The graph with edge attribute "alpha".
+        stacked_edge_mask (np.ndarray): The stacked edge mask whitch excludes edges with no flows
+        delta (float): The original K matrix is not invertable therefore the inverse of K + delta 1 is returned.
+    """
+    kappa_x_delta = get_kappa_x_delta(G, stacked_edge_mask, delta=delta)
+    return 1 / delta * kappa_x_delta
+
+
+def generate_coupling_matrix_OLD(G, f_mat, eps=1e-1):
     """
     Generate the D1 matrix for a given number of sources and edges.
 
@@ -169,7 +210,33 @@ def flow_mask(f_mat, eps=1e-1):
     return mask
 
 
-def layered_edge_incidence_matrix(G, few, eps=1e-1):
+def layered_edge_incidence_matrix(G, note_mask, edge_mask):
+    """
+    Generate the layered edge incidence matrix for a given graph and number of layers.
+
+    Parameters:
+        G (nx.DiGraph): The graph.
+        note_mask (np.ndarray): The flat edge mask whitch excludes notes
+        edge_mask (np.ndarray): The flat edge mask whitch excludes edges with no flows
+
+    Returns:
+        csr_array: The resulting layered edge incidence matrix.
+        np.ndarray: The updated note_mask
+    """
+    num_layers = len(edge_mask) // G.size()
+    E = -nx.incidence_matrix(G, oriented=True)  # Sparse matrix in CSC format
+
+    # Construct the sparse block matrix
+    EE_sparse = block_diag([E] * num_layers, format="csr")[:, edge_mask]
+
+    unconnected_notes = np.diff(EE_sparse.indptr) == 0
+    note_mask[unconnected_notes] = False
+    EE_sparse = EE_sparse[note_mask]
+
+    return EE_sparse.astype(int), note_mask
+
+
+def layered_edge_incidence_matrix_OLD(G, few, eps=1e-1):
     """
     Generate the layered edge incidence matrix for a given graph and number of layers.
 
@@ -182,22 +249,6 @@ def layered_edge_incidence_matrix(G, few, eps=1e-1):
     """
     num_layers = len(few)
     num_nodes = G.number_of_nodes()
-
-    # E_list = [sub_incidence_matrix(G, few[i], eps=eps) for i in range(num_layers)]
-
-    # print(np.shape(E_list))
-
-    # EE = np.block(
-    #    [
-    #        [
-    #            E_list[i] if i == j else np.zeros_like(E_list[i])
-    #            for j in range(num_layers)
-    #        ]
-    #        for i in range(num_layers)
-    #    ]
-    # )
-    # EE = EE[~np.all(EE == 0, axis=1)]
-    # EE = EE[:, ~np.all(EE == 0, axis=0)]
 
     E_list = [sub_incidence_matrix(G, few[i], eps=eps) for i in range(num_layers)]
 
@@ -213,13 +264,24 @@ def layered_edge_incidence_matrix(G, few, eps=1e-1):
     EE_sparse = EE_sparse[non_zero_rows][:, non_zero_cols]
 
     # warn if EE.shape[0] != num_layers*num_nodes
-    if EE_sparse.shape[0] != num_layers * num_nodes:
-        warnings.warn(
-            f"Mismatch detected: EE.shape[0] ({EE_sparse.shape[0]}) != num_layers * num_nodes ({num_layers * num_nodes}).",
-            UserWarning,
-        )
+    while EE_sparse.shape[0] != num_layers * num_nodes:
+        eps /= 1.25
+        E_list = [sub_incidence_matrix(G, few[i], eps=eps) for i in range(num_layers)]
+        EE_sparse = block_diag(E_list, format="csr")
+        non_zero_rows = np.diff(EE_sparse.indptr) > 0
+        non_zero_cols = np.diff(EE_sparse.tocsc().indptr) > 0
+        EE_sparse = EE_sparse[non_zero_rows][:, non_zero_cols]
+        if EE_sparse.shape[0] == num_layers * num_nodes:
+            warnings.warn(
+                f"Reduced eps to {eps:.2e} to match expected incidence matrix size."
+            )
+        if eps < 1e-10:
+            # EE_sparse.shape[0] != num_layers * num_nodes,
+            raise ValueError(
+                f"Could not match expected incidence matrix size. Current shape: {EE_sparse.shape}, Expected: ({num_layers * num_nodes}, {EE_sparse.shape[1]})"
+            )
 
-    return EE_sparse.astype(int)
+    return EE_sparse.astype(int), eps
 
 
 def generate_M_matrix(G, f_mat, eps=1e-1):
@@ -343,57 +405,7 @@ def delete_sparse_columns(sparse_matrix, col_indices):
     return sparse_matrix[:, mask]
 
 
-def derivative_social_cost_OLD(G, f_mat, od_matrix, eps=1e-1):
-    """
-    Compute the derivative of the social cost function with respect to the flow matrix.
-
-    Parameters:
-        G (nx.DiGraph): The graph.
-        f_mat (np.ndarray): The flow matrix.
-
-    Returns:
-        np.ndarray: The resulting derivative.
-    """
-    p_vec = np.hstack(od_matrix)
-
-    num_layers = len(f_mat)
-    source_nodes = np.where(p_vec > 0)[0]
-
-    alpha_arr = np.array(list(nx.get_edge_attributes(G, "alpha").values()))
-    alpha_vec = np.array([alpha_arr for _ in range(num_layers)]).flatten()
-    f_vec = np.hstack(f_mat)
-
-    LL, EE = coupled_laplacian(G, f_mat, eps=eps, return_incidences=True)
-    LL_tilde = np.delete(LL, source_nodes, axis=0)
-    LL_tilde = np.delete(LL_tilde, source_nodes, axis=1)
-    print("Effective Laplacian shape:", LL.shape)
-
-    # EE_tilde = np.delete(EE, source_nodes, axis=0)
-    EE_tilde = delete_sparse_rows(EE, source_nodes)
-
-    LL_tilde_inv = np.linalg.inv(LL_tilde)
-    # Linv = np.linalg.pinv(LL)
-
-    p_tilde = p_vec[p_vec <= 0]
-    slopes = -EE_tilde.T @ (LL_tilde_inv @ p_tilde) / alpha_vec[f_vec > eps]
-    full_edge_list = [edge for _ in range(num_layers) for edge in G.edges]
-    pos_flow_edge_indices = np.where(f_vec >= eps)[0]
-
-    slope_edge_dict = {}
-    for i, idx in enumerate(pos_flow_edge_indices):
-        slope_edge_dict[full_edge_list[idx]] = slopes[i]
-
-    # slope_edge_dict = {}
-    # k = 0
-    # for w in range(num_layers):
-    #    for i, edge in enumerate(edge_list[w]):
-    #        edge_tuple = edge + (w,)
-    #        slope_edge_dict[edge] = slopes[k]
-    #        k += 1
-    return slope_edge_dict
-
-
-def inverse_coupling_matrix(G, f_mat, eps=1e-1):
+def inverse_coupling_matrix_OLD(G, f_mat, eps=1e-1):
     num_layers = len(f_mat)
     num_edges = G.number_of_edges()
     alpha_ = np.array(list(nx.get_edge_attributes(G, "alpha").values()))
@@ -433,17 +445,132 @@ def inverse_coupling_matrix(G, f_mat, eps=1e-1):
     return kappa_reduced  # .toarray()
 
 
-def derivative_social_cost(G, f_mat, od_matrix, eps=1e-2):
+def get_kappa_x_delta(G, stacked_edge_mask, delta=1e-2):
+    """
+    Create the inverse matrix of the K block in the original problem times delta.
+
+    Parameters:
+        G (networkx.Graph): The graph with edge attribute "alpha".
+        stacked_edge_mask (np.ndarray): The stacked edge mask whitch excludes edges with no flows
+        delta (float): The original K matrix is not invertable therefore the inverse of K + delta 1 is returned.
+    """
+    num_layers = len(stacked_edge_mask)
+    num_edges = G.number_of_edges()
+    alpha_ = np.array(list(nx.get_edge_attributes(G, "alpha").values()))
+
+    rows_per_column = {
+        col: np.where(stacked_edge_mask[:, col])[0]
+        for col in range(stacked_edge_mask.shape[1])
+    }
+
+    kappa = lil_matrix((num_layers * num_edges, num_layers * num_edges))
+
+    for key, value in rows_per_column.items():
+        for i in value:
+            for j in value:
+                if i == j:
+                    kappa[i * num_edges + key, j * num_edges + key] = 1 - alpha_[
+                        key
+                    ] / (delta + alpha_[key] * len(value))
+
+                else:
+                    kappa[i * num_edges + key, j * num_edges + key] = -alpha_[key] / (
+                        delta + alpha_[key] * len(value)
+                    )
+
+    # Convert kappa to CSR format for efficient row and column operations
+    kappa_csr = kappa.tocsr()
+
+    # Keep only non-zero rows and columns
+    kappa_reduced = kappa_csr[stacked_edge_mask.flatten()][
+        :, stacked_edge_mask.flatten()
+    ]
+    return kappa_reduced  # .toarray()
+
+
+def derivative_social_cost(
+    G, f_mat, od_matrix, eps=1e-3, reg=1e-5, demands_to_sinks=True
+):
+    """
+    Calculate all derivatives
+
+    Parameters:
+        G (nx.DiGraph): The graph.
+        f_mat (np.ndarray): The flow on every edge of every subgraph from the numerical solver.
+        od_matrix (np.ndarray): The origin destination matrix.
+        eps (float): Threshold defining which flow on an edge is
+           considered no flow, these edges are removed from the corresponding subgraph.
+        reg (float): Small number which is used to make the problem invertable.
+
+    """
+
+    num_layers = len(f_mat)
+    p_vec = np.hstack(od_matrix)
+
+    if demands_to_sinks:
+        source_nodes = np.where(p_vec > 0)[0]
+    else:
+        source_nodes = np.where(p_vec < 0)[0]
+
+    edge_mask_stacked = f_mat > eps
+    edge_mask = edge_mask_stacked.flatten()
+    # source_nodes = np.where(p_vec > 0)[0]
+    note_mask_raw = np.ones(len(G) * num_layers, dtype=bool)
+    note_mask_raw[source_nodes] = False
+
+    EE, note_mask = layered_edge_incidence_matrix(G, note_mask_raw, edge_mask)
+
+    # K = generate_coupling_matrix(G, edge_mask)
+    # K = K + diags(np.full(K.shape[0], reg))
+    kappa_x_delta = get_kappa_x_delta(G, edge_mask_stacked, delta=reg)
+
+    mLL_x_delta = EE @ kappa_x_delta @ EE.T
+    p_filtered = p_vec[note_mask]
+
+    # Use only scipy
+    # solveA = splu(mLL_x_delta, permc_spec="COLAMD").solve
+    # approx 4x faster than splu
+    solveA = cholesky(mLL_x_delta).solve_A
+    blocksize = 512
+    n_LL = mLL_x_delta.shape[0]
+    p_x_D = np.empty(n_LL)
+    for i in tqdm.tqdm(range(0, n_LL, blocksize)):
+        i_start = i
+        i_end = min(i_start + blocksize, n_LL)
+        rhs = np.zeros((n_LL, i_end - i_start))
+        rhs[np.arange(i_start, i_end), np.arange(i_end - i_start)] = 1
+        D_prime_cols = solveA(-rhs)  # minues from lhs to make LL positive definit
+        p_x_D[i_start:i_end] = p_filtered @ D_prime_cols
+
+    slopes = -p_x_D @ EE @ kappa_x_delta
+    pos_flow_edge_indices = np.where(edge_mask)[0]
+    full_edge_list = [edge for _ in range(num_layers) for edge in G.edges]
+
+    slope_edge_dict = {edge: 0 for edge in G.edges}
+    for i, idx in enumerate(pos_flow_edge_indices):
+        # if key exsists add to it
+        if full_edge_list[idx] in slope_edge_dict:
+            slope_edge_dict[full_edge_list[idx]] += slopes[i]
+        # if key does not exist create new key
+        else:
+            slope_edge_dict[full_edge_list[idx]] = slopes[i].item()
+
+    return slope_edge_dict
+
+
+def derivative_social_cost_OLD(G, f_mat, od_matrix, eps=1e-2, demands_to_sinks=True):
     """ """
     start_time = time.time()
     num_layers = len(f_mat)
     p_vec = np.hstack(od_matrix)
     f_vec = np.hstack(f_mat)
-    source_nodes = np.where(p_vec > 0)[0]
+    if demands_to_sinks:
+        source_nodes = np.where(p_vec > 0)[0]
+    else:
+        source_nodes = np.where(p_vec < 0)[0]
 
+    EE, eps = layered_edge_incidence_matrix(G, f_mat, eps=eps)  # .toarray()
     kappa = inverse_coupling_matrix(G, f_mat, eps=eps)
-
-    EE = layered_edge_incidence_matrix(G, f_mat, eps=eps)  # .toarray()
     LL = -EE @ kappa @ EE.T
 
     # Efficiently delete rows and columns corresponding to source_nodes
@@ -462,12 +589,15 @@ def derivative_social_cost(G, f_mat, od_matrix, eps=1e-2):
     # b = -(EE_tilde @ kappa).tocsc()
     # C = spsolve(LL_tilde.tocsc(), b)
 
-    slopes = C.T @ p_vec[p_vec < 0]
+    if demands_to_sinks:
+        slopes = C.T @ p_vec[p_vec < 0]
+    else:
+        slopes = C.T @ p_vec[p_vec > 0]
 
     pos_flow_edge_indices = np.where(f_vec > eps)[0]
     full_edge_list = [edge for _ in range(num_layers) for edge in G.edges]
 
-    slope_edge_dict = {}
+    slope_edge_dict = {edge: 0 for edge in G.edges}
     for i, idx in enumerate(pos_flow_edge_indices):
         # if key exsists add to it
         if full_edge_list[idx] in slope_edge_dict:
@@ -486,8 +616,8 @@ def numerical_derivative(G, od_matrix, edge, num=25, var_percentage=0.1, **kwarg
     beta_list = np.linspace(beta_e - eps, beta_e + eps, num)
 
     social_cost_list = []
-    solver = kwargs.pop("solver", cp.MOSEK)
-    for beta_e in tqdm(beta_list):
+    solver = kwargs.pop("solver", cp.OSQP)
+    for beta_e in tqdm.tqdm(beta_list):
         beta[edge] = beta_e
         beta_arr = np.array(list(beta.values()))
         f = mc.solve_multicommodity_tap(
@@ -566,7 +696,7 @@ if __name__ == "__main__":
     p_vec = np.array(od_matrix).flatten()
 
     f_mat, lambda_mat = mc.solve_multicommodity_tap(
-        G, od_matrix, return_fw=True, pos_flows=True, solver=cp.MOSEK
+        G, od_matrix, return_fw=True, pos_flows=True, solver=cp.OSQP
     )
     F = np.sum(f_mat, axis=0)
     F_dict = dict(zip(G.edges, F))
@@ -608,13 +738,13 @@ if __name__ == "__main__":
 
     # %%
 
-    usage = memory_usage((derivative_social_cost, (G, f_mat, od_matrix), {"eps": 1e-3}))
-    print(f"Memory usage of the new function: {max(usage) - min(usage):.2f} MiB")
+    # usage = memory_usage((derivative_social_cost, (G, f_mat, od_matrix), {"eps": 1e-3}))
+    # print(f"Memory usage of the new function: {max(usage) - min(usage):.2f} MiB")
 
-    usage = memory_usage(
-        (derivative_social_cost_OLD, (G, f_mat, od_matrix), {"eps": 1e-3})
-    )
-    print(f"Memory usage of the old function: {max(usage) - min(usage):.2f} MiB")
+    # usage = memory_usage(
+    #    (derivative_social_cost_OLD, (G, f_mat, od_matrix), {"eps": 1e-3})
+    # )
+    # print(f"Memory usage of the old function: {max(usage) - min(usage):.2f} MiB")
     # %%
 
     edge = list(G.edges)[3]

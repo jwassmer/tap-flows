@@ -25,11 +25,13 @@ from src import periodicBoudary as pb
 PATH_TO_GHSL_TIF = "data/GHS/GHS_POP_P2030_GLOBE_R2022A_54009_100_V1_0.tif"
 
 
-def demands(G, num_commodities=1, gamma=0.1):
+def demands(G, num_commodities=1, gamma=0.1, return_sinks=False):
     nodes = ox.graph_to_gdfs(G, edges=False)
     selected_nodes = select_evenly_distributed_nodes(nodes, num_commodities)
 
     demands = demand_list(nodes, commodity=selected_nodes, gamma=gamma)
+    if return_sinks:
+        return demands, selected_nodes
     return demands
 
 
@@ -115,7 +117,12 @@ def select_evenly_distributed_nodes(nodes_gdf, N):
     coords = np.array(list(zip(nodes_gdf.geometry.x, nodes_gdf.geometry.y)))
 
     # Perform KMeans clustering
-    kmeans = KMeans(n_clusters=N, n_init=100, random_state=0)
+    kmeans = KMeans(
+        n_clusters=N,
+        init="k-means++",
+        n_init=1,
+        random_state=0,
+    )
     kmeans.fit(coords)
 
     # Find the closest point to each cluster centroid
@@ -384,10 +391,11 @@ def raster_population_to_voronois(
 def population_to_graph_nodes(graph):
     nodes = ox.graph_to_gdfs(graph, edges=False)
     voronoi_nodes = raster_population_to_voronois(nodes)
+    # Ensure minimum population is 1
+    voronoi_nodes["population"] = voronoi_nodes["population"].apply(lambda x: max(x, 1))
 
-    nx.set_node_attributes(
-        graph, voronoi_nodes["population"], "population"
-    )  # set minimum population of 1 to every ndoe
+    nx.set_node_attributes(graph, voronoi_nodes["population"], "population")
+
     nx.set_node_attributes(
         graph, voronoi_nodes["population_density"], "population_density"
     )
@@ -524,6 +532,7 @@ def osmGraph(
     highway_filter='["highway"~"motorway|trunk|primary|secondary|tertiary|unclassified|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link"]',
     return_boundary=False,
     heavy_boundary=False,
+    tolerance_meters=0,
     **kwargs,
 ):
     # place_name = place_name.replace(" ", "")
@@ -533,16 +542,32 @@ def osmGraph(
 
     city_hull = city_boundary.geometry.convex_hull
 
-    graph = ox.graph_from_polygon(city_hull.iloc[0], custom_filter=highway_filter)
+    graph = ox.graph_from_polygon(
+        city_hull.iloc[0], custom_filter=highway_filter, truncate_by_edge=True
+    )
     gcc_nodes = max(nx.strongly_connected_components(graph), key=len)
     graph = graph.subgraph(gcc_nodes)
+
+    if tolerance_meters > 0:
+        G_proj = ox.project_graph(graph)
+        G_clean = ox.simplification.consolidate_intersections(
+            G_proj,
+            tolerance=tolerance_meters,  # meters around each intersection center\
+            # node_attr_aggs={  # how to aggregate node attributes when merging
+            # "elevation": "mean",
+            # "street_count": "max",
+            # "population": "sum",
+            # add your own: "some_attr": ["min","max"] also works
+            # },
+        )
+        graph = ox.project_graph(G_clean, to_crs="EPSG:4326")
 
     graph = ox.add_edge_speeds(graph)
     graph = ox.add_edge_travel_times(graph)
     # print(graph)
     graph = population_to_graph_nodes(graph)
 
-    nodes, edges = ox.graph_to_gdfs(graph)
+    # nodes, edges = ox.graph_to_gdfs(graph)
     # districts = districts9
     # nodes = assign_nodes_to_districts(nodes, districts)
     # if nodes["district"].isnull().all():
@@ -550,7 +575,7 @@ def osmGraph(
     #    nodes = assign_nodes_to_districts(nodes, districts)
 
     # nodes["district"] = nodes["district"].fillna("no_district")
-    graph = ox.graph_from_gdfs(nodes, edges)
+    # graph = ox.graph_from_gdfs(nodes, edges)
     graph = set_number_of_lanes(graph)
     graph = set_effective_travel_time(graph)
 

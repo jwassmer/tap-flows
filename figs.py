@@ -253,6 +253,8 @@ plt.show()
 
 
 G = braess_graph()
+# G.relabel_nodes({0: "A", 1: "B", 2: "C", 3: "D"})
+G = nx.relabel_nodes(G, {0: "A", 1: "B", 2: "C", 3: "D"})
 P = np.zeros(G.number_of_nodes())
 load = 4
 P[0] = load
@@ -263,29 +265,29 @@ betas = np.linspace(0, 5, 100)
 
 social_cost_list = []
 for beta in betas:
-    G.edges[(2, 1)]["beta"] = beta
+    G.edges[("C", "B")]["beta"] = beta
     f = tap.user_equilibrium(G, P, positive_constraint=True)
     print(np.round(f, 2))
     social_cost_list.append(sc.total_social_cost(G, f))
 
-G.remove_edge(2, 1)
+G.remove_edge("C", "B")
 f = tap.user_equilibrium(G, P, positive_constraint=True)
 r_sc = sc.total_social_cost(G, f)
-G.add_edge(2, 1, beta=5)
+G.add_edge("C", "B", beta=5)
 
 
 # %%
 fig, axs = plt.subplots(1, 2, figsize=(10, 4))
 
 axs[0].plot(betas, social_cost_list, color="black", linewidth=3)
-axs[0].set_xlabel(r"edge length $\beta_{21}$", fontsize=22)
-axs[0].set_ylabel("Social cost", fontsize=22)
+axs[0].set_xlabel(r"edge length $\beta_{CB}$", fontsize=22)
+axs[0].set_ylabel(r"Social cost sc$(f_e)$", fontsize=22)
 axs[0].grid()
 axs[0].scatter(
     betas[-1],
     r_sc,
     color="red",
-    label="Removed edge (2, 1)",
+    label=r"Removed edge $(C, B)$",
     marker="x",
     zorder=3,
     s=100,
