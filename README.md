@@ -81,4 +81,11 @@ python3 analysis/fig_lambda_inequality_diagram.py
 
 ## License
 
-No license file is currently provided. Add `LICENSE` before publishing publicly.
+Source code in this repository is licensed under the MIT License. See `LICENSE`.
+
+Non-code assets are excluded from that license unless explicitly stated otherwise, including:
+- `data/`
+- `figs/`
+- `notes/`
+- `literature/`
+- `cache/`
