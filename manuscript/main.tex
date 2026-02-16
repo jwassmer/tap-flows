@@ -649,7 +649,7 @@ Writing it this way removes the prefactor $1/\delta$, which makes the step‑wis
 
 In this proof, we used the algebraic solution of user-equilibrium flows (given by \cref{eq:flow-solution-mat} for the optimization problem in \cref{eq:tap-node-link}) to compute the derivative of social cost with respect to an edge's free-flow travel time $\beta_e$. We showed that this derivative is constant with respect to $\beta_e$. This property allows us to determine whether social cost increases or decreases as $\beta_e$ changes, thereby assessing whether individual edges contribute to system efficiency or inefficiency.\\
 
-However, there are important caveats. First, we must solve the system numerically once to identify subgraphs $G(V,E^w)$ where algebraic solutions exist. Second, linearity of social cost can only be established within a fixed active subgraph. If $\beta_e$ changes substantially, the effective subgraph may change, and the algebraic solution may no longer apply. Consequently, this approach characterizes the system under infinitesimal changes in $\beta_e$; equivalently, it establishes piecewise linearity (see Appendix~\ref{app:active-set-stability} for a quantitative stability scan).
+However, there are important caveats. First, we must solve the system numerically once to identify subgraphs $G(V,E^w)$ where algebraic solutions exist. Second, linearity of social cost can only be established within a fixed active subgraph. If $\beta_e$ changes substantially, the effective subgraph may change, and the algebraic solution may no longer apply. Consequently, this approach characterizes the system under infinitesimal changes in $\beta_e$; equivalently, it establishes piecewise linearity (see Appendix~\ref{app:active-set-stability} for a quantitative stability scan and Appendix~\ref{app:local-breakpoint-predictor} for the local first-breakpoint predictor).
 
 
 \subsection{Social cost gradient centrality}\label{sec:scgc}
@@ -682,7 +682,7 @@ To validate our approach, \cref{fig:braess-social-cost} illustrates the derivati
 
 Edges highlighted in red exhibit positive derivatives, indicating that increasing their costs leads to higher social costs. In contrast, edges highlighted in blue show negative derivatives, implying that raising their costs reduces total social cost, thereby classifying them as Braessian.
 
-Panels (b--f) further show that analytical and numerical solutions coincide in a neighborhood of the initial $\beta_e$ values (highlighted in matching colors), where the relationship between social cost and $\beta_e$ is piecewise linear. As $\beta_e$ deviates further from its baseline, discrepancies emerge due to structural changes in the effective subgraph, underscoring that the analytical approximation is most reliable for small perturbations of $\beta_e$ (see Appendix~\ref{app:active-set-stability}).
+Panels (b--f) further show that analytical and numerical solutions coincide in a neighborhood of the initial $\beta_e$ values (highlighted in matching colors), where the relationship between social cost and $\beta_e$ is piecewise linear. As $\beta_e$ deviates further from its baseline, discrepancies emerge due to structural changes in the effective subgraph, underscoring that the analytical approximation is most reliable for small perturbations of $\beta_e$ (see Appendices~\ref{app:active-set-stability} and~\ref{app:local-breakpoint-predictor}).
 
 Additionally, in panels (b–e) we demonstrate that the SCGC is positive, meaning that increasing the corresponding $\beta_e$ values results in higher overall social cost. In contrast, panel (f) presents an edge with a negative SCGC, indicating that an increase in $\beta_e$ for this edge would reduce social cost, revealing a Braessian effect.
 
@@ -862,7 +862,7 @@ Importantly, the presence of Braessian links does not imply that every capacity 
 
 \subsection{Limitations and future work}
 
-While the current formulation provides a clear analytical foundation, several important limitations remain. A key restriction arises from the fact that SCGC exploits the piecewise linearity of total social cost with respect to free-flow travel times, which is inherent to the underlying linear link cost functions and static equilibrium formulation. This allows for an elegant and computationally efficient derivation of marginal sensitivities, but it also means that SCGC is strictly valid only within a fixed active-subgraph (equilibrium) regime. When marginal changes in link attributes lead to discontinuous shifts in route choice patterns or the activation of alternative paths, the derivative structure itself changes. Consequently, SCGC captures local sensitivity around the current equilibrium but does not provide a global picture of how larger interventions might reshape flow distributions and system performance (Appendix~\ref{app:active-set-stability}).
+While the current formulation provides a clear analytical foundation, several important limitations remain. A key restriction arises from the fact that SCGC exploits the piecewise linearity of total social cost with respect to free-flow travel times, which is inherent to the underlying linear link cost functions and static equilibrium formulation. This allows for an elegant and computationally efficient derivation of marginal sensitivities, but it also means that SCGC is strictly valid only within a fixed active-subgraph (equilibrium) regime. When marginal changes in link attributes lead to discontinuous shifts in route choice patterns or the activation of alternative paths, the derivative structure itself changes. Consequently, SCGC captures local sensitivity around the current equilibrium but does not provide a global picture of how larger interventions might reshape flow distributions and system performance (Appendices~\ref{app:active-set-stability} and~\ref{app:local-breakpoint-predictor}).
 
 This limitation is particularly relevant in networks with multiple near-optimal equilibria or where congestion dynamics are dominated by threshold effects. In such settings, even small infrastructure or demand changes can trigger qualitative shifts in traffic patterns that fall outside the linear response captured by SCGC. Future research should address this by extending the method to nonlinear cost functions or by embedding SCGC within dynamic traffic assignment frameworks that explicitly model time-dependent and path-switching behavior.
 
@@ -1029,6 +1029,62 @@ The results show that active-set stability is highest close to $\Delta\beta_k=0$
 \caption{Active-set stability under edge-wise perturbations of free-flow travel time. \textbf{(a)} Number of active-set entries that differ from the baseline active set when perturbing one edge parameter $\beta_k$ at a time. \textbf{(b)} Aggregate stability metrics across tested edges: exact stable fraction (black) and mean Jaccard similarity (blue dashed). The annotation reports the median local perturbation radius around zero for which exact active-set identity is preserved.}
 \label{fig:app-active-set-stability}
 \end{figure*}
+
+
+\section{Local first-breakpoint predictor}\label{app:local-breakpoint-predictor}
+This appendix formalizes the local predictor used to estimate when a perturbation of one edge parameter $\beta_k$ first changes the active set.
+We denote by $f_i$ the commodity-edge flow entries (stacked over tuples and edges), and by
+\begin{equation}
+s_i = \alpha_{e(i)} F_{e(i)} + \beta_{e(i)} - (\mathcal{E}^{\!\top}\lambda)_i
+\end{equation}
+the corresponding complementarity slack, where $F_{e(i)}=\sum_w f^w_{e(i)}$ is total flow on physical edge $e(i)$.
+At baseline, active entries satisfy $f_i^0>\varepsilon_{\mathrm{act}}$ and (up to tolerance) $s_i^0=0$, while inactive entries satisfy $f_i^0\approx 0$ and $s_i^0>0$.
+
+For a perturbation on one edge, $\beta_k=\beta_k^0+\eta$, and fixed active set, the reduced KKT system gives first-order responses
+\begin{equation}
+f_i(\eta)=f_i^0+\dot f_i\,\eta+o(\eta),\qquad
+s_i(\eta)=s_i^0+\dot s_i\,\eta+o(\eta).
+\end{equation}
+Candidate breakpoints are where either an active flow hits the activity threshold or an inactive slack hits zero.
+For the positive direction ($\eta>0$), these candidates are
+\begin{align}
+\eta^{+,\mathrm{leave}}_i &= \frac{\varepsilon_{\mathrm{act}}-f_i^0}{\dot f_i}
+\quad\text{for active }i\text{ with }\dot f_i<0,\\
+\eta^{+,\mathrm{enter}}_j &= -\frac{s_j^0}{\dot s_j}
+\quad\text{for inactive }j\text{ with }\dot s_j<0.
+\end{align}
+Analogously, for the negative direction ($\eta<0$), candidate magnitudes are
+\begin{align}
+\eta^{-,\mathrm{leave}}_i &= -\frac{\varepsilon_{\mathrm{act}}-f_i^0}{\dot f_i}
+\quad\text{for active }i\text{ with }\dot f_i>0,\\
+\eta^{-,\mathrm{enter}}_j &= \frac{s_j^0}{\dot s_j}
+\quad\text{for inactive }j\text{ with }\dot s_j>0.
+\end{align}
+The predicted directional first breakpoints are the smallest positive candidates,
+\begin{align}
+\hat\eta_k^+ &= \min\!\left(\eta^{+,\mathrm{leave}}_i,\eta^{+,\mathrm{enter}}_j\right),\\
+\hat\eta_k^- &= \min\!\left(\eta^{-,\mathrm{leave}}_i,\eta^{-,\mathrm{enter}}_j\right),
+\end{align}
+and the predicted symmetric local radius is
+\begin{equation}
+\hat r_k=\frac{1}{\beta_k^0}\min(\hat\eta_k^+,\hat\eta_k^-).
+\end{equation}
+
+The observed directional radii are obtained by repeated full equilibrium solves and active-set comparison:
+\begin{equation}
+r_{k,\pm}^{\mathrm{obs}}=\sup\{r\ge 0:\mathcal{A}_{k,\pm}(\rho)=\mathcal{A}_0\ \forall \rho\in[0,r]\},
+\end{equation}
+with $\beta_k=\beta_k^0(1\pm \rho)$.
+
+\cref{fig:app-linear-predictor-transfer} compares predicted and observed radii across graph families and demand/beta regimes.
+The concentration around the diagonal in some regimes indicates local usefulness, while the broad scatter away from the diagonal in others confirms that this first-order predictor should be interpreted as a local heuristic, not a globally reliable extrapolator.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\columnwidth]{assets/linear-predictor-transfer.pdf}
+\caption{Transfer test of the raw local linear first-breakpoint predictor. Each point corresponds to one edge-direction sample; color indicates graph family and marker indicates demand/beta regime. The dashed line marks perfect agreement ($\hat r=r^{\mathrm{obs}}$). Deviations from the diagonal quantify mismatch between local linear prediction and observed active-set stability radius.}
+\label{fig:app-linear-predictor-transfer}
+\end{figure}
 
 
 \section{Constructing real-world networks}\label{sec:generate_graphs}
