@@ -20,7 +20,7 @@ from geopy.geocoders import Nominatim
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-from src import periodicBoudary as pb
+from src import periodicBoundary as pb
 
 PATH_TO_GHSL_TIF = "data/GHS/GHS_POP_P2030_GLOBE_R2022A_54009_100_V1_0.tif"
 

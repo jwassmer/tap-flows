@@ -1,19 +1,24 @@
-# %%
+"""Social-cost utilities for linear edge travel-time functions."""
 
-from src import Graphs as gr
-from src import Plotting as pl
+from __future__ import annotations
 
-import numpy as np
+from typing import Dict, Hashable, Iterable, Tuple
+
 import networkx as nx
+import numpy as np
 from sklearn.linear_model import LinearRegression
 
+Node = Hashable
+Edge = Tuple[Node, Node]
 
-def braessGraph():
-    G = nx.DiGraph()
+
+
+def build_braess_graph() -> nx.DiGraph:
+    """Return the canonical Braess network used in analytic examples."""
+    graph = nx.DiGraph()
 
     a, b, c, d = 0, 1, 2, 3
-
-    G.add_nodes_from(
+    graph.add_nodes_from(
         [
             (a, {"pos": (0, 0.5)}),
             (b, {"pos": (0.5, 1)}),
@@ -22,7 +27,7 @@ def braessGraph():
         ]
     )
 
-    G.add_edges_from(
+    graph.add_edges_from(
         [
             (a, b, {"alpha": 1 / 100, "beta": 10}),
             (b, d, {"alpha": 1 / 1000, "beta": 25}),
@@ -32,221 +37,171 @@ def braessGraph():
         ]
     )
 
-    # G = updateEdgeWeights(G)
-    nx.set_edge_attributes(G, "black", "color")
-    nx.set_node_attributes(G, "lightgrey", "color")
-
-    return G
+    nx.set_edge_attributes(graph, "black", "color")
+    nx.set_node_attributes(graph, "lightgrey", "color")
+    return graph
 
 
-def _social_cost_from_vecs(G, alpha, beta, P):
-    E = -nx.incidence_matrix(G, oriented=True)
-    num_nodes = E.shape[0]
 
-    L = E @ np.diag(1 / alpha) @ E.T
-    nx.set_edge_attributes(G, dict(zip(G.edges, beta / alpha)), "gamma")
-    A = nx.adjacency_matrix(G, weight="gamma")
-    Gamma = A - A.T
-
-    lamb_ue = np.linalg.pinv(L) @ (P + Gamma @ np.ones(num_nodes))
-
-    delta_lamb = E.T @ lamb_ue
-
-    sc = (delta_lamb**2 - delta_lamb * beta) / alpha  # / load
-
-    return np.sum(sc)
+def braessGraph() -> nx.DiGraph:
+    """Backward-compatible alias for :func:`build_braess_graph`."""
+    return build_braess_graph()
 
 
-def total_social_cost(G, f, **kwargs):
+
+def _edge_arrays(
+    graph: nx.DiGraph,
+    alpha: np.ndarray | None = None,
+    beta: np.ndarray | None = None,
+) -> Tuple[np.ndarray, np.ndarray]:
+    if alpha is None:
+        alpha = np.array(list(nx.get_edge_attributes(graph, "alpha").values()), dtype=float)
+    if beta is None:
+        beta = np.array(list(nx.get_edge_attributes(graph, "beta").values()), dtype=float)
+    return np.asarray(alpha, dtype=float), np.asarray(beta, dtype=float)
+
+
+
+def social_cost_vec(
+    graph: nx.DiGraph,
+    f: Iterable[float],
+    alpha: np.ndarray | None = None,
+    beta: np.ndarray | None = None,
+) -> np.ndarray:
+    """Return per-edge social-cost contributions ``alpha f^2 + beta f``."""
+    alpha_arr, beta_arr = _edge_arrays(graph, alpha=alpha, beta=beta)
+    flow = np.asarray(f, dtype=float)
+    return alpha_arr * flow**2 + beta_arr * flow
+
+
+
+def total_social_cost(graph: nx.DiGraph, f: Iterable[float], **kwargs) -> float:
+    """Return total social cost for edge flows ``f``."""
     alpha = kwargs.pop("alpha", None)
     beta = kwargs.pop("beta", None)
-    if alpha is None:
-        alpha_d = nx.get_edge_attributes(G, "alpha")
-        alpha = np.array(list(alpha_d.values()))
-    if beta is None:
-        beta_d = nx.get_edge_attributes(G, "beta")
-        beta = np.array(list(beta_d.values()))
-    sc_vec = social_cost_vec(G, f, alpha=alpha, beta=beta)
-    return np.sum(sc_vec)
+    return float(np.sum(social_cost_vec(graph, f, alpha=alpha, beta=beta)))
 
 
-def social_cost_vec(G, f, alpha=None, beta=None):
-    if alpha is None:
-        alpha_d = nx.get_edge_attributes(G, "alpha")
-        alpha = np.array(list(alpha_d.values()))
-    if beta is None:
-        beta_d = nx.get_edge_attributes(G, "beta")
-        beta = np.array(list(beta_d.values()))
-    f = np.array(f)
-    return alpha * f**2 + beta * f
+
+def _social_cost_from_vecs(
+    graph: nx.DiGraph,
+    alpha: np.ndarray,
+    beta: np.ndarray,
+    demands: np.ndarray,
+) -> float:
+    """Analytic social cost using incidence-based closed form."""
+    incidence = -nx.incidence_matrix(graph, oriented=True)
+    num_nodes = incidence.shape[0]
+
+    laplacian = incidence @ np.diag(1 / alpha) @ incidence.T
+    nx.set_edge_attributes(graph, dict(zip(graph.edges, beta / alpha)), "gamma")
+    adjacency = nx.adjacency_matrix(graph, weight="gamma")
+    gamma = adjacency - adjacency.T
+
+    multipliers = np.linalg.pinv(laplacian) @ (demands + gamma @ np.ones(num_nodes))
+    delta_lambda = incidence.T @ multipliers
+
+    sc_values = (delta_lambda**2 - delta_lambda * beta) / alpha
+    return float(np.sum(sc_values))
 
 
-def all_braess_edges(G, P):
-    E = -nx.incidence_matrix(G, oriented=True).toarray()
-    P = np.array(P)
 
-    alpha_d = nx.get_edge_attributes(G, "alpha")
-    alpha_arr = np.array(list(alpha_d.values()))
+def derivative_social_cost_edge(
+    graph: nx.DiGraph,
+    laplacian_inverse: np.ndarray,
+    demands: np.ndarray,
+    edge: Edge,
+    alpha: np.ndarray,
+) -> float:
+    """Derivative of social cost w.r.t. ``beta_edge`` using closed form."""
+    a, b = edge
+    node_order = list(graph.nodes)
+    edge_order = list(graph.edges)
 
-    L = E @ np.diag(1 / alpha_arr) @ E.T
-    Linv = np.linalg.pinv(L)
+    a_idx = node_order.index(a)
+    b_idx = node_order.index(b)
+    edge_idx = edge_order.index(edge)
 
-    is_braessian = {}
-
-    for edge in G.edges:
-        slope = derivative_socia_cost_ab(G, Linv, P, edge, alpha_arr)
-        is_braessian[edge] = slope
-
-    return is_braessian
-
-
-def slope_social_cost(G, P, edge):
-    # a, b = edge
-    # edge_idx = list(G.edges).index(edge)
-    E = -nx.incidence_matrix(G, oriented=True).toarray()
-    P = np.array(P)
-
-    alpha_d = nx.get_edge_attributes(G, "alpha")
-    alpha_arr = np.array(list(alpha_d.values()))
-
-    L = E @ np.diag(1 / alpha_arr) @ E.T
-    Linv = np.linalg.pinv(L)
-
-    return derivative_socia_cost_ab(G, Linv, P, edge, alpha_arr)
+    demand_vec = np.asarray(demands, dtype=float)
+    slope = (laplacian_inverse[a_idx, :] - laplacian_inverse[b_idx, :]) @ demand_vec
+    return float(slope / alpha[edge_idx])
 
 
-def all_derivatives_slope_social_cost(G, P):
-    # a, b = edge
-    # edge_idx = list(G.edges).index(edge)
-    E = -nx.incidence_matrix(G, oriented=True).toarray()
-    P = np.array(P)
 
-    alpha_d = nx.get_edge_attributes(G, "alpha")
-    alpha_arr = np.array(list(alpha_d.values()))
-
-    L = E @ np.diag(1 / alpha_arr) @ E.T
-    Linv = np.linalg.pinv(L)
-
-    dsc = (E.T @ Linv @ P) / alpha_arr
-
-    dsc_dict = dict(zip(G.edges, dsc))
-
-    return dsc_dict
+def derivative_socia_cost_ab(
+    graph: nx.DiGraph,
+    laplacian_inverse: np.ndarray,
+    demands: np.ndarray,
+    edge: Edge,
+    alpha: np.ndarray,
+) -> float:
+    """Backward-compatible alias with original misspelled name."""
+    return derivative_social_cost_edge(graph, laplacian_inverse, demands, edge, alpha)
 
 
-def derivative_socia_cost_ab(G, Linv, P, edge, alpha_arr):
-    a, b = edge[0], edge[1]
 
-    a_idx = list(G.nodes).index(a)
-    b_idx = list(G.nodes).index(b)
+def all_social_cost_derivatives(
+    graph: nx.DiGraph,
+    demands: np.ndarray,
+    alpha_arr: np.ndarray | None = None,
+) -> Dict[Edge, float]:
+    """Return derivatives of total social cost w.r.t all edge ``beta`` values."""
+    alpha_arr, _ = _edge_arrays(graph, alpha=alpha_arr, beta=None)
 
-    edge_idx = list(G.edges()).index(edge)
+    incidence = -nx.incidence_matrix(graph, oriented=True)
+    laplacian = incidence @ np.diag(1 / alpha_arr) @ incidence.T
+    laplacian_inverse = np.linalg.pinv(laplacian)
 
-    P = np.array(P)
-
-    slope = (Linv[a_idx, :] - Linv[b_idx, :]) @ P / alpha_arr[edge_idx]
-    return slope
-
-
-def linreg_slope_sc(G, P, edge):
-    alpha_d = nx.get_edge_attributes(G, "alpha")
-    beta_d = nx.get_edge_attributes(G, "beta")
-    alpha_arr = np.array(list(alpha_d.values()))
-    beta_arr = np.array(list(beta_d.values()))
-
-    beta_e = np.linspace(-1e1, 1e1, 5)
-
-    edge_idx = list(G.edges).index(edge)
-
-    sc_beta = []
-    for i, bet in enumerate(beta_e):
-        beta_arr[edge_idx] = bet
-        s = _social_cost_from_vecs(G, alpha_arr, beta_arr, P)
-        sc_beta.append(s)
-
-    # Reshape the data for linear regression
-    X = np.array(beta_e).reshape(-1, 1)
-    y = np.array(sc_beta)
-
-    # Create and fit the linear regression model
-    model = LinearRegression()
-    model.fit(X, y)
-    # y_intercept = model.intercept_
-    m = model.coef_[0]
-    return m
-
-
-def all_social_cost_derivatives(G, P, alpha_arr=None):
-    if alpha_arr is None:
-        alpha_arr = np.array(list(nx.get_edge_attributes(G, "alpha").values()))
-
-    E = -nx.incidence_matrix(G, oriented=True)
-    L = E @ np.diag(1 / alpha_arr) @ E.T
-    Linv = np.linalg.pinv(L)
     slopes = {}
-
-    for e in G.edges:
-        s = derivative_socia_cost_ab(G, Linv, P, e, alpha_arr)
-        slopes[e] = s
+    for edge in graph.edges:
+        slopes[edge] = derivative_social_cost_edge(
+            graph,
+            laplacian_inverse,
+            demands,
+            edge,
+            alpha_arr,
+        )
     return slopes
 
 
-# %%
 
-if __name__ == "__main__":
-    from src import TAPOptimization as tap
-    from src import Plotting as pl
-
-    import matplotlib.pyplot as plt
-
-    G = gr.random_planar_graph(10, seed=1)
-
-    # G = braessGraph()
-
-    E = -nx.incidence_matrix(G, oriented=True).toarray()
-    P = np.zeros(G.number_of_nodes())
-    load = 1
-    source = 0
-    P[source] = load
-    targets = [-1]
-    P[targets] = -load / len(targets)
-
-    f_ue, lamb_ue = tap.user_equilibrium(
-        G, P, positive_constraint=True, return_lagrange_multiplier=True
-    )
-    f_, lamb_ = tap.linearTAP(G, P)
-    # print(tap.social_cost(G, f_) / load)
-
-    slopes = all_derivatives_slope_social_cost(G, P)
-    print(slopes)
-
-    # %%
-
-    # edge = min(slopes, key=slopes.get)
-
-    beta_e = np.linspace(-1e1, 1e1, 5)
-
-    for edge, slope in slopes.items():
-
-        m = linreg_slope_sc(G, P, edge)
-
-        print(np.isclose(m, slope))
-
-    # %%
-
-    E = -nx.incidence_matrix(G, oriented=True).toarray()
-    alpha = np.array(list(nx.get_edge_attributes(G, "alpha").values()))
-    beta = np.array(list(nx.get_edge_attributes(G, "beta").values()))
-    L = E @ np.diag(1 / alpha) @ E.T
-
-    E @ (beta / alpha)
-
-    Linv = np.linalg.pinv(L)
-
-    # %%
-    dscdbeta = np.round(E.T @ Linv @ P, 3)
-
-    # %%
+def all_derivatives_slope_social_cost(graph: nx.DiGraph, demands: np.ndarray):
+    """Legacy wrapper for the analytic derivative computation."""
+    return all_social_cost_derivatives(graph, demands)
 
 
-# %%
+
+def slope_social_cost(graph: nx.DiGraph, demands: np.ndarray, edge: Edge) -> float:
+    """Return a single edge derivative of social cost."""
+    alpha_arr, _ = _edge_arrays(graph)
+    incidence = -nx.incidence_matrix(graph, oriented=True).toarray()
+    laplacian = incidence @ np.diag(1 / alpha_arr) @ incidence.T
+    laplacian_inverse = np.linalg.pinv(laplacian)
+    return derivative_social_cost_edge(graph, laplacian_inverse, demands, edge, alpha_arr)
+
+
+
+def all_braess_edges(graph: nx.DiGraph, demands: np.ndarray) -> Dict[Edge, float]:
+    """Return edge derivatives; negative entries correspond to Braess edges."""
+    return all_social_cost_derivatives(graph, demands)
+
+
+
+def linreg_slope_sc(graph: nx.DiGraph, demands: np.ndarray, edge: Edge) -> float:
+    """Estimate slope via linear regression over local beta perturbations."""
+    alpha_arr, beta_arr = _edge_arrays(graph)
+    edge_idx = list(graph.edges).index(edge)
+
+    beta_values = np.linspace(-1e1, 1e1, 5)
+    social_cost_values = []
+
+    for beta_value in beta_values:
+        trial_beta = beta_arr.copy()
+        trial_beta[edge_idx] = beta_value
+        social_cost_values.append(
+            _social_cost_from_vecs(graph, alpha_arr, trial_beta, np.asarray(demands))
+        )
+
+    model = LinearRegression()
+    model.fit(beta_values.reshape(-1, 1), np.asarray(social_cost_values))
+    return float(model.coef_[0])

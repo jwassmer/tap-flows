@@ -1,14 +1,12 @@
 # %%
 import numpy as np
 import networkx as nx
-from src import Equilibirium as eq
+from src import Equilibrium as eq
 from src import ConvexOptimization as cv
 from src import GraphGenerator as gg
 from src import LinAlg as la
 
 import pytest
-import numpy as np
-from src import ConvexOptimization as cv
 
 
 @pytest.mark.parametrize(

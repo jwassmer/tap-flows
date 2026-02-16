@@ -9,24 +9,27 @@ import matplotlib.pyplot as plt
 import cvxpy as cp
 
 from src import Plotting as pl
+from src._graph_utils import (
+    edge_attribute_array,
+    random_directed_cost_graph,
+    validate_node_balance,
+)
 
 
 def social_cost(G, F):
-    alpha_d = nx.get_edge_attributes(G, "alpha")
-    beta_d = nx.get_edge_attributes(G, "beta")
-    alpha_arr = np.array(list(alpha_d.values()))
-    beta_arr = np.array(list(beta_d.values()))
+    alpha_arr = edge_attribute_array(G, "alpha")
+    beta_arr = edge_attribute_array(G, "beta")
 
-    return np.sum(alpha_arr @ F**2 + beta_arr @ F)
+    flow = np.asarray(F, dtype=float).reshape(-1)
+    return np.sum(alpha_arr @ flow**2 + beta_arr @ flow)
 
 
 def potential_energy(G, F):
-    alpha_d = nx.get_edge_attributes(G, "alpha")
-    beta_d = nx.get_edge_attributes(G, "beta")
-    alpha_arr = np.array(list(alpha_d.values()))
-    beta_arr = np.array(list(beta_d.values()))
+    alpha_arr = edge_attribute_array(G, "alpha")
+    beta_arr = edge_attribute_array(G, "beta")
+    flow = np.asarray(F, dtype=float).reshape(-1)
 
-    return np.sum(1 / 2 * alpha_arr @ F**2 + beta_arr @ F)
+    return np.sum(1 / 2 * alpha_arr @ flow**2 + beta_arr @ flow)
 
 
 def optimize_tap(
@@ -49,15 +52,11 @@ def optimize_tap(
     start_time = time.time()
     A = -nx.incidence_matrix(G, oriented=True)  # .toarray()
 
-    # tt_funcs = nx.get_edge_attributes(G, "tt_function")
     alpha = kwargs.pop("alpha", None)
     beta = kwargs.pop("beta", None)
-    if alpha is None:
-        alpha_d = nx.get_edge_attributes(G, "alpha")
-        alpha = np.array(list(alpha_d.values()))
-    if beta is None:
-        beta_d = nx.get_edge_attributes(G, "beta")
-        beta = np.array(list(beta_d.values()))
+    alpha = edge_attribute_array(G, "alpha", alpha)
+    beta = edge_attribute_array(G, "beta", beta)
+    demand_vec = validate_node_balance(G, demands)
 
     # Number of edges
     num_edges = G.number_of_edges()
@@ -68,15 +67,13 @@ def optimize_tap(
     elif not positive_constraint:
         flows = cp.Variable(num_edges)
 
-    demand_constraint = A @ flows == demands
+    demand_constraint = A @ flows == demand_vec
     constraints = [demand_constraint]
 
     if with_capacity:
-        capacity = np.array(list(nx.get_edge_attributes(G, "capacity").values()))
+        capacity = edge_attribute_array(G, "capacity")
         if len(capacity) > 0:
             constraints.append(flows <= capacity)
-        else:
-            print("No " "capacity" " assigned to edges.")
 
     if social_optimum:
         Q = 1
@@ -106,9 +103,9 @@ def optimize_tap(
         print("Time:", conv_time, "s")
 
     if return_lagrange_multiplier:
-        return flows.value, lagrange_multipliers
+        return np.asarray(flows.value).reshape(-1), lagrange_multipliers
     else:
-        return flows.value
+        return np.asarray(flows.value).reshape(-1)
 
 
 def social_optimum(
@@ -146,48 +143,13 @@ def random_graph(
     alpha=1,
     beta=0,
 ):
-    connected = False
-    if num_edges < num_nodes - 1:
-        num_edges = num_nodes - 1
-
-    while not connected:
-        U = nx.gnm_random_graph(num_nodes, num_edges, seed=seed)
-        connected = nx.is_connected(U)
-        num_edges += 1
-
-    if isinstance(alpha, str) and alpha == "random_symmetric":
-        # doesnt work atm
-        np.random.seed(seed)
-        alpha = np.random.uniform(0.1, 1, U.number_of_edges())
-    if isinstance(beta, str) and beta == "random_symmetric":
-        # doesnt work atm
-        np.random.seed(seed)
-        beta = 100 * np.random.rand(U.number_of_edges())
-
-    G = U.to_directed()
-
-    if isinstance(alpha, (int, float)):
-        alpha = alpha * np.ones(G.number_of_edges())
-    if isinstance(beta, (int, float)):
-        beta = beta * np.ones(G.number_of_edges())
-    if isinstance(alpha, str) and alpha == "random":
-        np.random.seed(seed)
-        alpha = np.random.uniform(0.1, 1, G.number_of_edges())
-    if isinstance(beta, str) and beta == "random":
-        np.random.seed(seed)
-        beta = 100 * np.random.rand(G.number_of_edges())
-
-    # nx.set_edge_attributes(G, tt_func, "tt_function")
-    nx.set_edge_attributes(G, dict(zip(G.edges, alpha)), "alpha")
-    nx.set_edge_attributes(G, dict(zip(G.edges, beta)), "beta")
-
-    pos = nx.spring_layout(G, seed=seed)
-    nx.set_node_attributes(G, pos, "pos")
-
-    nx.set_edge_attributes(G, "black", "color")
-    nx.set_node_attributes(G, "lightgrey", "color")
-
-    return G
+    return random_directed_cost_graph(
+        num_nodes=num_nodes,
+        num_edges=num_edges,
+        seed=seed,
+        alpha=alpha,
+        beta=beta,
+    )
 
 
 def linearTAP(G, P, social_optimum=False, **kwargs):
@@ -205,12 +167,9 @@ def linearTAP(G, P, social_optimum=False, **kwargs):
 
     alpha_arr = kwargs.pop("alpha", None)
     beta_arr = kwargs.pop("beta", None)
-    if alpha_arr is None:
-        alpha_d = nx.get_edge_attributes(G, "alpha")
-        alpha_arr = np.array(list(alpha_d.values()))
-    if beta_arr is None:
-        beta_d = nx.get_edge_attributes(G, "beta")
-        beta_arr = np.array(list(beta_d.values()))
+    alpha_arr = edge_attribute_array(G, "alpha", alpha_arr)
+    beta_arr = edge_attribute_array(G, "beta", beta_arr)
+    P = validate_node_balance(G, P)
 
     E = -nx.incidence_matrix(G, oriented=True)
 
@@ -249,6 +208,11 @@ def ODmatrix(G):
     return A
 
 
+def od_matrix(G):
+    """Preferred snake_case alias for :func:`ODmatrix`."""
+    return ODmatrix(G)
+
+
 def kappa_matrix(G):
     alpha_d = nx.get_edge_attributes(G, "alpha")
     alpha_arr = np.array(list(alpha_d.values()))
@@ -283,6 +247,11 @@ def gamma_vector(G):
         b = beta_dict[e]
         gamma[k] += b / a
     return gamma
+
+
+def linear_tap(G, P, social_optimum=False, **kwargs):
+    """Preferred snake_case alias for :func:`linearTAP`."""
+    return linearTAP(G, P, social_optimum=social_optimum, **kwargs)
 
 
 # %%

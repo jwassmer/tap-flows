@@ -113,7 +113,7 @@ def cycle_link_incidence_matrix(G):
 # %%
 
 if __name__ == "__main__":
-    from src import Equilibirium as eq
+    from src import Equilibrium as eq
     from src import GraphGenerator as gg
     from src import Plotting as pl
 

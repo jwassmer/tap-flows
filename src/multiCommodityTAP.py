@@ -6,7 +6,11 @@ import networkx as nx
 
 from src import ConvexOptimization as co
 from src import Plotting as pl
-from src import osmGraphs as og
+from src._graph_utils import (
+    edge_attribute_array,
+    random_directed_cost_graph,
+    validate_node_balance,
+)
 
 
 def solve_tap(
@@ -19,6 +23,8 @@ def solve_tap(
     beta=None,
     **kwargs
 ):
+    from src import osmGraphs as og
+
     if num_sources == "all":
         num_sources = G.number_of_nodes()
 
@@ -27,7 +33,7 @@ def solve_tap(
     f = solve_multicommodity_tap(
         G, demand_list, social_optimum, pos_flows, alpha=alpha, beta=beta, **kwargs
     )
-    nx.set_edge_attributes(G, dict(zip(G.edges, f)), "flow")
+    nx.set_edge_attributes(G, dict(zip(G.edges, np.asarray(f).reshape(-1))), "flow")
 
 
 nx.DiGraph.flows = solve_tap
@@ -73,19 +79,28 @@ def solve_multicommodity_tap(
     start_time = time.time()
     A = -nx.incidence_matrix(G, oriented=True)  # .toarray()
 
-    if alpha is None:
-        alpha_d = nx.get_edge_attributes(G, "alpha")
-        alpha = np.array(list(alpha_d.values()))
-
-    if beta is None:
-        beta_d = nx.get_edge_attributes(G, "beta")
-        beta = np.array(list(beta_d.values()))
+    alpha = edge_attribute_array(G, "alpha", alpha)
+    beta = edge_attribute_array(G, "beta", beta)
 
     # Number of edges
     num_edges = G.number_of_edges()
 
     # Number of commodities
-    num_commodities = len(demands)
+    if isinstance(demands, np.ndarray):
+        if demands.ndim == 1:
+            demand_items = [demands]
+        elif demands.ndim == 2:
+            demand_items = [demands[i, :] for i in range(demands.shape[0])]
+        else:
+            raise ValueError(f"Expected 1D or 2D demand array, got shape {demands.shape}.")
+    else:
+        demand_items = list(demands)
+
+    if len(demand_items) == 0:
+        raise ValueError("Demands must contain at least one commodity vector.")
+
+    demand_vectors = [validate_node_balance(G, d) for d in demand_items]
+    num_commodities = len(demand_vectors)
 
     # Variables for the flow on each edge for each commodity
     if pos_flows:
@@ -96,7 +111,7 @@ def solve_multicommodity_tap(
     # Combine the constraints for flow conservation
     constraints = []
     for k in range(num_commodities):
-        constraints.append(A @ flows[k] == demands[k])
+        constraints.append(A @ flows[k] == demand_vectors[k])
 
     if social_optimum:
         Q = 1
@@ -104,7 +119,12 @@ def solve_multicommodity_tap(
         Q = 1 / 2
 
     # Objective function
-    total_flow = cp.sum(flows)
+    flow_matrix = (
+        cp.vstack(flows)
+        if num_commodities > 1
+        else cp.reshape(flows[0], (1, num_edges), order="F")
+    )
+    total_flow = cp.sum(flow_matrix, axis=0)
     objective = cp.Minimize(
         cp.sum((cp.multiply(Q * alpha, total_flow**2)) + cp.multiply(beta, total_flow))
     )
@@ -114,7 +134,6 @@ def solve_multicommodity_tap(
     # Extracting specific kwargs if provided, otherwise setting default values
 
     return_fw = kwargs.pop("return_fw", False)
-
     prob.solve(**kwargs)
 
     # Extract the flows for each commodity
@@ -125,15 +144,12 @@ def solve_multicommodity_tap(
         print("Time:", conv_time, "s")
 
     if return_fw:
-        fw = []
-        for k, flow in enumerate(flows):
-            fw.append(flow.value)
+        fw = [np.asarray(flow.value).reshape(-1) for flow in flows]
 
         lambda_s = [c.dual_value for c in constraints]
         return np.array(fw), np.array(lambda_s)
-        # return fw
 
-    return total_flow.value
+    return np.asarray(total_flow.value).reshape(-1)
 
 
 def random_graph(
@@ -143,39 +159,13 @@ def random_graph(
     alpha=1,
     beta=0,
 ):
-    connected = False
-    if num_edges < num_nodes - 1:
-        num_edges = num_nodes - 1
-
-    while not connected:
-        U = nx.gnm_random_graph(num_nodes, num_edges, seed=seed)
-        connected = nx.is_connected(U)
-        num_edges += 1
-
-    G = U.to_directed()
-
-    if isinstance(alpha, str) and alpha == "random":
-        np.random.seed(seed)
-        alpha = np.random.uniform(0.1, 1, G.number_of_edges())
-    if isinstance(beta, str) and beta == "random":
-        np.random.seed(seed)
-        beta = 100 * np.random.rand(G.number_of_edges())
-
-    if isinstance(alpha, (int, float)):
-        alpha = alpha * np.ones(G.number_of_edges())
-    if isinstance(beta, (int, float)):
-        beta = beta * np.ones(G.number_of_edges())
-
-    nx.set_edge_attributes(G, dict(zip(G.edges, alpha)), "alpha")
-    nx.set_edge_attributes(G, dict(zip(G.edges, beta)), "beta")
-
-    pos = nx.spring_layout(G, seed=seed)
-    nx.set_node_attributes(G, pos, "pos")
-
-    nx.set_edge_attributes(G, "black", "color")
-    nx.set_node_attributes(G, "lightgrey", "color")
-
-    return G
+    return random_directed_cost_graph(
+        num_nodes=num_nodes,
+        num_edges=num_edges,
+        seed=seed,
+        alpha=alpha,
+        beta=beta,
+    )
 
 
 # %%

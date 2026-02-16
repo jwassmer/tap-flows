@@ -7,7 +7,7 @@ import itertools
 from src import GraphGenerator as gg
 from src import LinAlg as la
 from src import Plotting as pl
-from src import Equilibirium as eq
+from src import Equilibrium as eq
 import time
 from scipy.optimize import linprog
 

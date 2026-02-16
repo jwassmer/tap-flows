@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 
-from src import Equilibirium as eq
+from src import Equilibrium as eq
 from src import TAPOptimization as tap
 
 np.set_printoptions(precision=3, suppress=True)
@@ -101,13 +101,22 @@ def graphPlot(
         ec = np.ones(graph.number_of_edges())
 
     if isinstance(ec, str):
-        flows = {nx.get_edge_attributes(graph, ec)}
+        flows = nx.get_edge_attributes(graph, ec)
+        if len(flows) != graph.number_of_edges():
+            raise ValueError(
+                f"Edge attribute '{ec}' missing on at least one edge "
+                f"({len(flows)}/{graph.number_of_edges()})."
+            )
     elif isinstance(ec, list):
         flows = dict(zip(graph.edges(), ec))
     elif isinstance(ec, np.ndarray):
         flows = dict(zip(graph.edges(), ec))
     elif isinstance(ec, dict):
         flows = ec
+    else:
+        raise TypeError(
+            "Expected ec to be None, edge-attribute name, list, ndarray, or dict."
+        )
     # elif cc
 
     vmax = max(flows.values())
@@ -237,7 +246,7 @@ def graphPlot(
             ax.set_title(
                 ax.get_title() + "\n" + rf"$\sum_{{e\in E}} U(f_e)=${pe}", fontsize=12
             )
-    except:
+    except Exception:
         pass
 
     ax.axis("off")
@@ -250,7 +259,7 @@ from sys import platform
 
 if platform != "linux":
     if __name__ == "__main__":
-        from src import Equilibirium as eq
+        from src import Equilibrium as eq
 
         g = nx.erdos_renyi_graph(10, 0.3, directed=True, seed=42)
         pos = nx.spring_layout(g)

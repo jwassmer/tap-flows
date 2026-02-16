@@ -2,7 +2,7 @@
 import networkx as nx
 import numpy as np
 import itertools
-from src import Equilibirium as eq
+from src import Equilibrium as eq
 from src import Plotting as pl
 
 
