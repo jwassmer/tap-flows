@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 gamma = 0.04
 G = gr.random_planar_graph(50, seed=42)
 
-G.flows(num_sources="all", gamma=gamma, solver=cp.MOSEK)
-G.derivative_social_cost(num_sources="all", gamma=gamma, eps=1e-3, solver=cp.MOSEK)
+G.flows(num_sources="all", gamma=gamma, solver=cp.OSQP)
+G.derivative_social_cost(num_sources="all", gamma=gamma, eps=1e-3, solver=cp.OSQP)
 nodes, edges = ox.graph_to_gdfs(G)
 # %%
 

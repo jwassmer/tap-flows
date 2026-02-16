@@ -13,83 +13,87 @@ import osmnx as ox
 import numpy as np
 import cvxpy as cp
 import matplotlib as mpl
+import pandas as pd
 
 import time
 
 
-def demand_list(nodes, target_nodes_idx_list, gamma=0.1):
-    # nodes, edges = ox.graph_to_gdfs(G)
-    # nodes["source_node"] = False
+def demand_list(
+    nodes,
+    destination_nodes,
+    gamma=0.05,
+    demand_col="population",
+):
+    """
+    Generate OD demand list from nodes to given destination nodes.
 
-    # sink_node_idx = sink_node.index[0]
-    demands = []
-    for t in target_nodes_idx_list:
+    Parameters
+    ----------
+    nodes : GeoDataFrame or DataFrame
+        Node table with at least `id_col` and `demand_col` columns.
+    commodity : list or array
+        IDs (or indices) of destination nodes.
+    gamma : float
+        Fraction of each node's population that generates demand.
+    demand_col : str
+        Column name for demand size (e.g. population).
+    seed : int, optional
+        Random seed for reproducibility.
 
-        source_nodes_index = nodes.index.difference([t])
+    Returns
+    -------
+    od_list : DataFrame
+        Columns: ['origin', 'destination', 'demand']
+    """
 
-        P = dict(zip(nodes.index, np.zeros(len(nodes))))
+    origins = np.array(nodes.index)
+    destinations = np.array(destination_nodes.index)
+    od_mat = pd.DataFrame(0, index=origins, columns=destinations, dtype=float)
 
-        for s in source_nodes_index:
-            P[s] = nodes.loc[s, "population"] * gamma / len(target_nodes_idx_list)
+    total_pop = destination_nodes[demand_col].sum()
+    destination_attractiveness = destination_nodes[demand_col] / total_pop
 
-        P[t] = -np.sum(list(P.values()))
+    for d in destinations:
 
-        demands.append(list(P.values()))
-    # tot_sources = np.sum(list(P.values()))
+        for o in origins:
+            pop = nodes.loc[o, demand_col]
+            demand_total = pop * gamma
+            od_mat.loc[o, d] = demand_total * destination_attractiveness[d]
 
-    # for t in target_nodes_idx_list:
-    # P[t] = nodes.loc[t, "population"] * (1 - gamma)
-    #    P[t] = -tot_sources / len(target_nodes_idx_list)
+        od_mat.loc[d, d] = od_mat.loc[d, d] - od_mat[d].sum()
 
-    # print("Total Population:", tot_pop)
-    return demands
+    return np.array(od_mat).T
 
 
 # %%
 
 
 G, boundary = og.osmGraph(
-    "Munich,Germany",
+    "Cologne,Germany",
     return_boundary=True,
     tolerance_meters=100,
-    highway_filter='["highway"~"motorway|trunk|primary|secondary|tertiary|unclassified"]',
+    highway_filter='["highway"~"motorway|trunk|primary|secondary"]',
 )
 
 nodes, edges = ox.graph_to_gdfs(G)
 
-# %%
-adresss_list = [
-    "Werner-Heisenberg-Allee 25, 80939 München",
-]
-target_node_idx_list = []
-for a in adresss_list:
-    location = ox.geocode(a)
-    print(location)
-    node_idx = ox.distance.nearest_nodes(G, location[1], location[0])
-    target_node_idx_list.append(node_idx)
-
-target_node_idx_list = np.unique(target_node_idx_list)
-
+num_destinations = len(nodes) // 10
+destination_nodes = og.select_evenly_distributed_nodes(nodes, num_destinations)
+od_mat = demand_list(
+    nodes,
+    destination_nodes,
+    gamma=0.03,
+    demand_col="population",
+)
 
 # %%
-tot_pop = nodes["population"].sum()
-
-seats_rhein_energie = 70_000
-
-fraction_of_population = (seats_rhein_energie / tot_pop) * 0.15
-od_mat = demand_list(nodes, target_node_idx_list, gamma=fraction_of_population)
-
-od_mat = np.array(od_mat) * -1
-# %%
-
-nodes, edges = ox.graph_to_gdfs(G)
 f_mat, lambda_mat = mc.solve_multicommodity_tap(
     G, od_mat, return_fw=True, pos_flows=True, solver=cp.OSQP, verbose=True
 )
 F = np.sum(f_mat, axis=0)
 
 edges["flow"] = F
-dsc = mcsc.derivative_social_cost(G, f_mat, od_mat, eps=1e-3)
+dsc = mcsc.derivative_social_cost(G, f_mat, od_mat, eps=1e-3, demands_to_sinks=False)
 dsc_vec = list(dsc.values())
 edges["dsc"] = dsc_vec
 # edges.sort_values("flow", ascending=True, inplace=True)
@@ -124,15 +128,6 @@ cb = fig.colorbar(
 edges.sort_values("flow", ascending=True, inplace=True)
 edges.plot(ax=ax, linewidth=2, column="flow", cmap=cmap, norm=norm, legend=False)
 
-stadium_node = nodes.loc[target_node_idx_list]
-
-stadium_node.plot(
-    ax=ax,
-    marker="s",
-    color="black",
-    markersize=100,
-    zorder=3,
-)
 cb.ax.set_xlabel("Vehicle flow $f_{e}$")
 
 ax = axs[1]
@@ -165,21 +160,15 @@ edges.plot(
 )
 
 braess_edges = edges[edges["dsc"] < 0]
-braess_edges.plot(
-    ax=ax,
-    linewidth=2,
-    color="#0571b0",
-    label="Braess edges",
-)
 
-stadium_node.plot(
-    ax=ax,
-    marker="s",
-    color="black",
-    markersize=100,
-    zorder=3,
-    label="Allianz Arena",
-)
+if len(braess_edges) > 0:
+    braess_edges.plot(
+        ax=ax,
+        linewidth=2,
+        color="#0571b0",
+        label="Braess edges",
+    )
+
 
 axs[1].legend(
     loc="upper right",

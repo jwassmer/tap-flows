@@ -97,7 +97,13 @@ od_mat = demand_list(
 
 
 f_mat, lambda_mat = mc.solve_multicommodity_tap(
-    G, od_mat, return_fw=True, pos_flows=True, solver=cp.OSQP, verbose=False
+    G,
+    od_mat,
+    return_fw=True,
+    pos_flows=True,
+    solver=cp.OSQP,
+    verbose=True,
+    max_iter=20_000,
 )
 F = np.sum(f_mat, axis=0)
 
@@ -282,5 +288,9 @@ stats = {
 }
 
 stats
+
+# %%
+
+edges[edges["load"] > 0.8]["length"].sum()
 
 # %%
