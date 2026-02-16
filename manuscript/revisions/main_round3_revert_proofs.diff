@@ -1,0 +1,29 @@
+*** Begin Patch
+*** Update File: notes/main.tex
+@@
+-Define $r_n^w:=-p_n^w$ for destination nodes of commodity $w$ (and $r_n^w=0$ otherwise), so that $r_n^w\ge0$ represents destination demand magnitudes. Since the total travel time between $o(w)$ and $n$ is path-independent on the active support, we have
++By noting that the vector $p$ contains the flow starting at the unique origin node of subgraph $w$, $o(w)$, and ending at another node $n$, and that the total travel time is independent of the path taken, we have
+@@
+-    sc = \sum_{w}\sum_{n} r^{w}_{n}\,t^{w}_{\text{total},n}
+-        = \sum_{w}\sum_{n}r^{w}_{n}\bigl(\lambda^{w}_{o(w)}-\lambda^{w}_{n}\bigr).
++    sc = -\sum_{w}\sum_{n} p^{w}_{n}\,t^{w}_{\text{total},n}
++        = -\sum_{w}\sum_{n}p^{w}_{n}\bigl(\lambda^{w}_{o(w)}-\lambda^{w}_{n}\bigr).
+@@
+-Let $\mathbf{d}$ denote the reduced stacked vector of destination demand magnitudes (all entries non-negative). Using the fact that we set $\lambda^{w}_{o(w)}=0$, we obtain
++Here $p$ is the reduced vector that contains destination withdrawal magnitudes only. Using the stacked notation from before and the fact that we set $\lambda^{w}_{o(w)}=0$, we obtain
+@@
+-    sc = -\sum_{i} d_{i}\lambda_{i}.
++    sc = -\sum_{i} p_{i}\lambda_{i}.
+@@
+-    sc = -\sum_{i} d_{i}\bigl(\matr{S}^{-1}\matr{\mathcal{E}}\matr{K}^{-1}\boldsymbol{\beta}
+-                     + \matr{S}^{-1}\tilde{\mathbf{p}}\bigr)_{i}.
++    sc = -\sum_{i} p_{i}\bigl(\matr{S}^{-1}\matr{\mathcal{E}}\matr{K}^{-1}\boldsymbol{\beta}
++                     + \matr{S}^{-1}\mathbf{p}\bigr)_{i}.
+@@
+-        = -\,d_{q}\,S^{-1}_{qp}\,\mathcal{E}_{pl}\,K^{-1}_{lj}\,\delta_{e(j),k},
++        = -\,p_{q}\,S^{-1}_{qp}\,\mathcal{E}_{pl}\,K^{-1}_{lj}\,\delta_{e(j),k},
+@@
+-        = d_{q}\bigl(\mathcal{E}L\mathcal{E}^{\!\top}\bigr)^{-1}_{qp}\,
++        = p_{q}\bigl(\mathcal{E}L\mathcal{E}^{\!\top}\bigr)^{-1}_{qp}\,
+           \mathcal{E}_{pl}\,L_{lj}\,\delta_{e(j),k}.
+*** End Patch

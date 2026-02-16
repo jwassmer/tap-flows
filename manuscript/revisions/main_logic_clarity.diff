@@ -1,0 +1,72 @@
+*** Begin Patch
+*** Update File: notes/main.tex
+@@
+-We restrict each OD tuple $w$ to one of two forms: $w = (o, d_1, d_2, \dots, d_n)$, where one origin node $o$ supplies multiple destinations, or $w = (d, o_1, o_2, \dots, o_n)$, where multiple origins supply one destination node $d$. We exclude mixtures of multiple origins and multiple destinations within the same OD tuple to preserve a unique flow direction.
++For the analytical derivations below, we restrict each OD tuple $w$ to one of two forms: $w = (o, d_1, d_2, \dots, d_n)$, where one origin node $o$ supplies multiple destinations, or $w = (d, o_1, o_2, \dots, o_n)$, where multiple origins supply one destination node $d$. Excluding mixtures of multiple origins and multiple destinations within the same OD tuple is a modeling choice that preserves a unique net flow direction and simplifies the decomposition.
+@@
+-Here, $y^o$ denotes the total demand injected at an origin node, and $y^d$ the total demand withdrawn at a destination node. Additionally, the demand vector $p^w$ is constructed to satisfy flow conservation: $\sum_{n \in V} p^w_n = 0.$
++Here, $y^o>0$ denotes the total demand injected at an origin node, and $y^d<0$ the total demand withdrawn at a destination node. Additionally, the demand vector $p^w$ is constructed to satisfy flow conservation: $\sum_{n \in V} p^w_n = 0.$
+@@
+-In this section, we derive an analytical solution for the user equilibrium of the TAP using the linear cost function specified in Equation~\ref{eq:linear-travel-time}.
+-To begin, we solve the problem without considering the inequality constraints, i.e., initially neglecting the non‑negativity constraint on flows. The corresponding Lagrangian function is formulated as follows:
++In this section, we derive an analytical solution for the user equilibrium of the TAP using the linear cost function specified in Equation~\ref{eq:linear-travel-time}.
++To obtain a closed form, we first consider the equality-constrained system on a fixed active set (edges with positive flow). In practice, this active set is identified once from the full constrained problem, and the algebraic derivation below is then carried out on that fixed support.
++The corresponding Lagrangian function is formulated as follows:
+@@
+-We can solve this equation to obtain the flows directly. However, because we have not imposed the positive‑flow constraint $f_e^{w}\ge0$, the resulting flows may contain negative values, which are physically meaningless for vehicle flow.
+-To address this, we now explicitly re‑introduce the non‑negativity constraint on $f_e^{w}$ from the original optimisation problem. Incorporating this constraint into Eq.~\ref{eq:lagrangian-deriv} yields:
++We can solve this equation to obtain the flows directly. However, because we have not yet enforced the non-negativity constraint $f_e^{w}\ge0$, the resulting flows may contain negative values, which are physically meaningless for vehicle flow.
++For an edge $e=(n,m)$ in the active set of tuple $w$, Eq.~\ref{eq:deriv-lagrangian-zero} implies
+ \begin{align}
+-    \sum_{w\in W}f_e^{w}
+-    = \frac{1}{\alpha_e}\Bigl(\sum_{n\in V}\lambda_n^{w}E_{ne}-\beta_e\Bigr)
+-    &\ge 0 \nonumber\\
+-    = \frac{1}{\alpha_e}\bigl(\lambda_n^{w}-\lambda_m^{w}\bigr)
+-      -\frac{\beta_e}{\alpha_e} &\ge 0 .
++    f_e
++    = \frac{1}{\alpha_e}\Bigl(\sum_{n\in V}\lambda_n^{w}E_{ne}-\beta_e\Bigr)
++    = \frac{1}{\alpha_e}\bigl(\lambda_n^{w}-\lambda_m^{w}-\beta_e\bigr)
++      \ge 0 .
+ \end{align}
+-From this we immediately obtain the following necessary condition for the Lagrange multipliers $\lambda_n^{w}$:
++From this we obtain the following necessary condition for active edges:
+@@
+-    \caption{Illustration of the directional-consistency condition imposed by~\cref{eq:lambda-condition}. Along each directed edge, the Lagrange multipliers must increase by at least the corresponding edge length $\beta_e$. Consequently, the graph cannot contain directed loops when all edge lengths are strictly positive.}
++    \caption{Illustration of the directional-consistency condition imposed by~\cref{eq:lambda-condition}. Along each directed edge carrying positive flow, the multiplier at the tail node exceeds the multiplier at the head node by at least $\beta_e$. Consequently, the active support cannot contain directed loops when all edge lengths are strictly positive.}
+@@
+-The implications of this condition are illustrated in \cref{fig:lambda-condition}. Starting from a node~$n$, the multiplier of a neighbouring node~$m$ satisfies $\lambda_m=\lambda_n+\beta_{nm}$. If a directed cycle existed, returning to the initial node would imply
++The implications of this condition are illustrated in \cref{fig:lambda-condition}. For a directed edge $n\to m$ in the active set, \cref{eq:lambda-condition} gives $\lambda_n\ge\lambda_m+\beta_{nm}$. Summing this inequality along a directed cycle $C$ would yield
+ \begin{align}
+-    \lambda_n = \lambda_n + \beta_{nm} + \beta_{mn},
++    \lambda_n \ge \lambda_n + \sum_{e\in C}\beta_e,
+ \end{align}
+-which contradicts the original condition. Hence, if both edge costs $\beta_{nm}$ and $\beta_{mn}$ are positive, a consistent algebraic solution cannot exist. Feasible solutions are therefore restricted to graph structures that satisfy \cref{eq:lambda-condition}, i.e. to \emph{directed acyclic graphs (DAGs)}.
++which is impossible if all $\beta_e>0$. Hence, under this positivity assumption, the active edge support of each OD-specific subgraph is acyclic. This statement concerns the active-support subgraphs used in the algebraic solution, not necessarily the full physical network.
+@@
+-By considering these subgraphs we can reformulate the system using a generalized node‑edge incidence matrix, where rows corresponding to edges that do not exist in subgraph $w$ are omitted:
++By considering these subgraphs we can reformulate the system using a generalized node‑edge incidence matrix, where columns corresponding to edges that do not exist in subgraph $w$ are omitted:
+@@
+-    \in\mathbb{R}^{\bigl(|E^{1}|+|E^{2}|+\dots+|E^{W}|\bigr)\times |V|\cdot|W|}.
++    \in\mathbb{R}^{|V|\cdot|W|\times\bigl(|E^{1}|+|E^{2}|+\dots+|E^{W}|\bigr)}.
+@@
+-The $\lambda$ value of the single source for each origin‑destination tuple is set to zero, and the continuity equation for the same node in this subgraph is removed because it is redundant.
++The $\lambda$ value of the single source for each origin‑destination tuple is set to zero, and the continuity equation for that same node is removed in each subgraph because it is redundant.
+@@
+-    \in\mathbb{R}^{\bigl[N_{t,e}+N_{t,n}-1\bigr]\times\bigl[N_{t,e}+N_{t,n}-1\bigr]},\\
++    \in\mathbb{R}^{\bigl[N_{t,e}+N_{t,n}-|W|\bigr]\times\bigl[N_{t,e}+N_{t,n}-|W|\bigr]},\\
+@@
+-To validate our approach, \cref{fig:braess-social-cost} illustrates the derivative of social cost with respect to $\beta_e$ for each edge in a small example graph. Panel (a) shows the analytical solution (see \cref{eq:cost-gradient}). Panels (b–f) display numerical evaluations obtained through multiple numerical solutions—specifically, solving the system 25 times per edge, amounting to 100 solutions in total for this small example. The analytical method thus significantly reduces computational effort.
++To validate our approach, \cref{fig:braess-social-cost} illustrates the derivative of social cost with respect to $\beta_e$ for each edge in a small example graph. Panel (a) shows the analytical solution (see \cref{eq:cost-gradient}). Panels (b–f) display numerical evaluations obtained through multiple numerical solutions, specifically, solving the system 25 times per edge, amounting to 125 solutions in total for this small example. The analytical method thus significantly reduces computational effort.
+@@
+-    &= \begin{cases}
+-        -d^w, & \text{ if node $n$ is the origin in a OD tuple $w$},\\
+-        d^w, & \text{ if node $n$ is the destination in a OD tuple $w$},\\
++    &= \begin{cases}
++        d^w, & \text{ if node $n$ is the origin in a OD tuple $w$},\\
++        -d^w, & \text{ if node $n$ is the destination in a OD tuple $w$},\\
+         0, &\text{ otherwise},
+     \end{cases}\\
+@@
+-Furthermore, the inequality constraints of Equation~\ref{eq:tap-node-link} can be transformed trivially into the inequality constraints of Equation~\ref{eq:tap-node-link}.
++Furthermore, the inequality constraints of Equation~\ref{eq:app-tap-link-path} can be transformed trivially into the inequality constraints of Equation~\ref{eq:app-tap-node-link}.
+*** End Patch

@@ -11,7 +11,9 @@ Traffic Assignment Problem (TAP) tooling for:
 - `src/`: core library modules (optimization, graph generation, plotting, OSM processing).
 - `test/`: automated tests.
 - `analysis/`: canonical scripts used to generate publication figures.
-- `experiments/`: ad-hoc scratchpad/trash folder for informal experiments and one-off scripts.
+- `manuscript/`: LaTeX manuscript sources and revision artifacts.
+- `notes/`: non-code reference material (PDF notes and external documents).
+- `messy_code/`: ad-hoc scratchpad/trash folder for informal experiments and one-off scripts.
 - `data/`: cached graph inputs and experiment artifacts.
 - `figs/`: generated outputs (PDF/PNG/GeoJSON).
 
@@ -75,6 +77,13 @@ python3 analysis/fig_potsdam_braess_osm.py
 python3 analysis/fig_lambda_inequality_diagram.py
 ```
 
+Build manuscript:
+
+```bash
+cd manuscript
+latexmk -pdf main.tex
+```
+
 ## Notes
 
 - Some figure and OSM workflows need additional geospatial dependencies and external data.
@@ -87,5 +96,6 @@ Non-code assets are excluded from that license unless explicitly stated otherwis
 - `data/`
 - `figs/`
 - `notes/`
+- `manuscript/`
 - `literature/`
 - `cache/`

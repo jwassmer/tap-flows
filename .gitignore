@@ -1,9 +1,5 @@
 .DS_Store
 
- *.pdf
- *.png
- *.tif
-
 #folders
 cache
 src/__pycache__
@@ -14,3 +10,34 @@ data/city_bounds
 slurm
 
 __pycache__
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.loc
+*.log
+*.out
+*.run.xml
+*.soc
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+*.nav
+*.snm
+*.vrb
+*.xdv
+
+# Generated latexdiff intermediates
+mainNotes.bib
+main_diffNotes.bib
+manuscript/mainNotes.bib
+manuscript/revisions/main_diff.tex
+manuscript/revisions/main_diffNotes.bib
+
+# Manuscript working/build folders
+manuscript/archive/
