@@ -29,7 +29,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src import Graphs as gr
-from src.figure_style import add_panel_label, apply_publication_style
+from src.figure_style import apply_publication_style
 
 _BREAKPOINT_CORE_PATH = (
     REPO_ROOT / "analysis" / "fig_active_set_breakpoint_prediction.py"
@@ -354,7 +354,6 @@ def _plot_directional_scatter(
     # Render at manuscript single-column scale with sufficiently large typography.
     apply_publication_style(font_size=12)
     fig, ax = plt.subplots(1, 1, figsize=(3.45, 3.55))
-    add_panel_label(ax, r"\textbf{a}", x=0.05, y=1.04, fontsize=16)
 
     x_all = np.array([float(r["obs_signed_pct"]) for r in rows], dtype=float)
     y_all = np.array([float(r["pred_signed_pct"]) for r in rows], dtype=float)

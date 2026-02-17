@@ -227,17 +227,17 @@ def _plot_results(
     path = Path(output_figure)
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    apply_publication_style(font_size=14)
+    apply_publication_style(font_size=16)
     fig, axes = plt.subplots(
-        1,
         2,
-        figsize=(12, 5),
-        gridspec_kw={"width_ratios": [2.4, 1.3]},
+        1,
+        figsize=(4.8, 6.2),
+        gridspec_kw={"height_ratios": [1.25, 1.9]},
     )
     ax_heatmap, ax_summary = axes
 
-    add_panel_label(ax_heatmap, r"\textbf{a}", x=0.03, y=1.03, fontsize=22)
-    add_panel_label(ax_summary, r"\textbf{b}", x=0.06, y=1.03, fontsize=22)
+    add_panel_label(ax_heatmap, r"\textbf{a}", x=0.03, y=1.12, fontsize=20)
+    add_panel_label(ax_summary, r"\textbf{b}", x=0.03, y=1.04, fontsize=20)
 
     vmax = max(int(np.max(changed_entries)), 1)
     heatmap = ax_heatmap.imshow(
@@ -249,23 +249,30 @@ def _plot_results(
         vmax=vmax,
     )
 
-    tick_idx = np.linspace(0, len(delta_values) - 1, 11, dtype=int)
+    tick_idx = np.linspace(0, len(delta_values) - 1, 5, dtype=int)
     tick_labels = [f"{100.0 * delta_values[i]:.1f}" for i in tick_idx]
     ax_heatmap.set_xticks(tick_idx, tick_labels)
 
     selected_labels = [_format_edge(edges[i]) for i in selected_indices]
-    if len(selected_labels) > 20:
-        y_step = max(1, len(selected_labels) // 12)
+    if len(selected_labels) > 8:
+        y_step = max(1, int(np.ceil(len(selected_labels) / 8)))
         y_ticks = np.arange(0, len(selected_labels), y_step, dtype=int)
         ax_heatmap.set_yticks(y_ticks, [selected_labels[i] for i in y_ticks])
     else:
         ax_heatmap.set_yticks(np.arange(len(selected_labels)), selected_labels)
 
-    ax_heatmap.set_xlabel(r"Relative perturbation of selected edge $\beta_k$ [\%]")
+    ax_heatmap.set_xlabel(r"Relative perturbation $\beta_k$ [\%]")
     ax_heatmap.set_ylabel("Perturbed edge")
-    ax_heatmap.set_title("Active-set deviation from baseline")
+    ax_heatmap.set_title("Deviation from baseline")
 
-    colorbar = fig.colorbar(heatmap, ax=ax_heatmap, pad=0.02, shrink=0.9)
+    colorbar = fig.colorbar(
+        heatmap,
+        ax=ax_heatmap,
+        orientation="vertical",
+        pad=0.02,
+        shrink=0.96,
+        fraction=0.075,
+    )
     colorbar.set_label("Changed active-set entries")
 
     delta_percent = 100.0 * delta_values
@@ -289,7 +296,7 @@ def _plot_results(
     )
     ax_summary.axvline(0.0, color="grey", linestyle=":", linewidth=1.2)
     ax_summary.set_ylim(-0.02, 1.02)
-    ax_summary.set_xlabel(r"Relative perturbation of selected edge $\beta_k$ [\%]")
+    ax_summary.set_xlabel(r"Relative perturbation of edge $\beta_k$ [\%]")
     ax_summary.set_ylabel("Stability score")
     ax_summary.set_title("Aggregate active-set stability")
     ax_summary.grid(alpha=0.3)

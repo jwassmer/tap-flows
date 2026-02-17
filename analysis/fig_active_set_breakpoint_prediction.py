@@ -32,7 +32,7 @@ if str(REPO_ROOT) not in sys.path:
 from src import Graphs as gr
 from src import multiCommoditySocialCost as msc
 from src import multiCommodityTAP as mc
-from src.figure_style import add_panel_label, apply_publication_style
+from src.figure_style import apply_publication_style
 from src.paper_examples import build_classic_braess_validation_graph
 
 OUTPUT_FIGURE = "figs/active-set-breakpoint-prediction.pdf"
@@ -1142,7 +1142,6 @@ def _plot_results(
 
     apply_publication_style(font_size=14)
     fig, ax_scatter = plt.subplots(1, 1, figsize=(7.2, 6.2))
-    add_panel_label(ax_scatter, r"\textbf{a}", x=0.04, y=1.02, fontsize=22)
 
     lim_pct = 100.0 * delta_limit
     obs_minus_clip = np.minimum(np.asarray(observed_minus_pct, dtype=float), lim_pct)
