@@ -38,6 +38,8 @@ main_diffNotes.bib
 manuscript/mainNotes.bib
 manuscript/revisions/main_diff.tex
 manuscript/revisions/main_diffNotes.bib
+manuscript/main_before_breakpoint_vs_current.diff*
+manuscript/revisions/main_before_breakpoint_vs_current.diff*
 
 # Manuscript working/build folders
 manuscript/archive/
