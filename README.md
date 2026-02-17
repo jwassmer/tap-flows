@@ -72,9 +72,10 @@ python3 analysis/fig_classic_braess_scgc_validation.py
 python3 analysis/fig_user_equilibrium_vs_social_optimum.py
 python3 analysis/fig_multicommodity_decomposition.py
 python3 analysis/fig_synthetic_gamma_scan.py
-python3 analysis/fig_cologne_stadium_traffic.py
-python3 analysis/fig_potsdam_braess_osm.py
+python3 analysis/fig_cologne_stadium_traffic.py --demand-multipliers 0.8,1.0,1.2
+python3 analysis/fig_potsdam_braess_osm.py --demand-multipliers 0.9,1.0,1.1
 python3 analysis/fig_lambda_inequality_diagram.py
+python3 analysis/fig_intervention_validation.py --medium
 ```
 
 Build manuscript:
@@ -87,6 +88,7 @@ latexmk -pdf main.tex
 ## Notes
 
 - Some figure and OSM workflows need additional geospatial dependencies and external data.
+- OSM workflows may require online geocoding/download if local boundary/graph caches are missing.
 
 ## License
 
