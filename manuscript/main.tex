@@ -873,7 +873,6 @@ A key implication is that SCGC extends conventional edge ranking beyond purely s
 
 At the same time, SCGC should be interpreted as a local response measure around the current operating point. Its value is strongest when used as a differential indicator that complements scenario-based planning, rather than replacing it. In practical terms, SCGC can prioritize where detailed simulations or intervention studies should be concentrated, thereby reducing the search space for policy design in large urban networks.
 This empirical usefulness is supported by the cross-city intervention validation (Appendix~\ref{app:intervention-validation}): across 42 tested budget points, SCGC ranking is best in 100\% of cases and attains substantially higher one-edge rank correlation with realized impact than flow or betweenness baselines.
-Interpreted as a binomial proportion, this 42/42 win record corresponds to an exact 95\% confidence interval of approximately $[91.6\%, 100\%]$.
 Put simply, when we perturb the top-ranked roads by the same small amount, the SCGC-ranked set consistently produces the largest realized deterioration in total network performance, confirming that SCGC better captures true marginal criticality.
 
 \subsection{Policy relevance}
@@ -1046,9 +1045,9 @@ The results show that active-set stability is highest close to $\Delta\beta_k=0$
 This appendix formalizes the local predictor used to estimate when a perturbation of one edge parameter $\beta_k$ first changes the active set.
 We denote by $f_i$ the commodity-edge flow entries (stacked over tuples and edges), and by
 \begin{equation}
-s_i = \alpha_{e(i)} F_{e(i)} + \beta_{e(i)} - (\mathcal{E}^{\!\top}\lambda)_i
+s_i = \alpha_{e(i)} f_{e(i)} + \beta_{e(i)} - (\mathcal{E}^{\!\top}\lambda)_i
 \end{equation}
-the corresponding complementarity slack, where $F_{e(i)}=\sum_w f^w_{e(i)}$ is total flow on physical edge $e(i)$.
+the corresponding complementarity slack, where $f_{e(i)}=\sum_w f^w_{e(i)}$ is total flow on physical edge $e(i)$.
 At baseline, active entries satisfy $f_i^0>\varepsilon_{\mathrm{act}}$ and (up to tolerance) $s_i^0=0$, while inactive entries satisfy $f_i^0\approx 0$ and $s_i^0>0$.
 
 For a perturbation on one edge, $\beta_k=\beta_k^0+\eta$, and fixed active set, the reduced KKT system gives first-order responses
@@ -1118,7 +1117,7 @@ For SCGC, the local predicted single-edge impact is
 with $\Delta\beta_e=\rho\beta_e$ in the stress-test setting.
 We then compare this first-order ranking to realized one-edge impacts and to multi-edge top-$k$ outcomes.
 
-Across all tested real-world budgets and demand levels (42 budget points in total, i.e., $3\times(8+6)$ from Cologne budgets $k=1,\dots,8$ and Potsdam budgets $k=1,\dots,6$), SCGC attains a strict 100\% budget-wise win rate over flow, betweenness, and random baselines (exact binomial 95\% CI for the win share: $[91.6\%,100\%]$).
+Across all tested real-world budgets and demand levels (42 budget points in total, i.e., $3\times(8+6)$ from Cologne budgets $k=1,\dots,8$ and Potsdam budgets $k=1,\dots,6$), SCGC attains a strict 100\% budget-wise win rate over flow, betweenness, and random baselines.
 Pooling both cities and all demand multipliers, the mean realized social-cost increase is 0.0219\% for SCGC (95\% bootstrap CI: 0.0180--0.0259), compared with 0.0164\% for flow (0.0133--0.0199), 0.0092\% for betweenness (0.0078--0.0106), and 0.0091\% for random (0.0070--0.0113). The mean SCGC--flow gap is 0.0054 percentage points (95\% bootstrap CI: 0.0046--0.0063), i.e., a relative gain of about 33\% over flow.
 For single-edge perturbations, pooled rank correlation between predicted and observed impact is $\rho\approx0.995$ for SCGC (95\% bootstrap CI: 0.989--0.999), versus $\rho\approx0.578$ for flow (0.543--0.609) and $\rho\approx0.041$ for betweenness (-0.011--0.088).
 These results support the claim that SCGC captures marginal system sensitivity more faithfully than topology-only or flow-only baselines across heterogeneous urban operating conditions.
