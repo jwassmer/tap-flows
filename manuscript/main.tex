@@ -58,7 +58,7 @@
 
 \begin{document}
 
-\title{A social cost-based centrality to quantify road significance in self-organizing traffic networks}
+\title{A Social-Cost Sensitivity Centrality for Traffic Networks}
 
 \author{Jonas Wassmer}
 \affiliation{Potsdam Institute for Climate Impact Research (PIK), Member of the Leibniz Association, Potsdam, Germany}
@@ -76,14 +76,14 @@
 
 
 \begin{abstract}
-Urban road networks are prototypical complex systems in which large numbers of individual agents interact through shared infrastructure, giving rise to collective traffic equilibria. These equilibria emerge from decentralized route choice decisions and exhibit a strong sensitivity to local changes in network properties. Even small modifications to the capacity or free-flow travel time of a single link can trigger large-scale reconfigurations of traffic flows, as illustrated by the Braess paradox. Conventional measures of link importance often overlook this systemic sensitivity and its implications for network efficiency. In this study, we introduce a social cost-based centrality measure that quantifies the marginal impact of link-level free-flow travel time perturbations on total social cost under Wardrop equilibrium. The measure is derived analytically from the linear formulation of the traffic assignment problem, enabling efficient and interpretable computation of local sensitivities on fixed active subgraphs (and thus piecewise-linear behavior across regime changes). We demonstrate the approach in synthetic and real-world urban networks, revealing structurally critical links that exert disproportionate influence on travel costs. Beyond improving network efficiency, this framework supports targeted interventions that can reduce unnecessary travel, lower emissions, and contribute to the transition toward more sustainable and livable cities.
+Urban road networks are prototypical complex systems in which large numbers of individual agents interact through shared infrastructure, giving rise to collective traffic equilibria. These equilibria emerge from decentralized route choice decisions and exhibit a strong sensitivity to local changes in network properties. Even small modifications to the capacity or free-flow travel time of a single link can trigger large-scale reconfigurations of traffic flows, as illustrated by the Braess paradox. Conventional measures of link importance often overlook this systemic sensitivity and its implications for network efficiency. In this study, we introduce a social cost-based centrality measure that quantifies the marginal impact of link-level free-flow travel time perturbations on total social cost under Wardrop equilibrium. The measure is derived analytically from the linear formulation of the traffic assignment problem, enabling efficient and interpretable computation of local sensitivities on fixed active-support subgraphs (and thus piecewise-linear behavior across regime changes). We demonstrate the approach in synthetic and real-world urban networks, revealing structurally critical links that exert disproportionate influence on travel costs. Beyond improving network efficiency, this framework supports targeted interventions that can reduce unnecessary travel, lower emissions, and contribute to the transition toward more sustainable and livable cities.
 \end{abstract}
 
 \maketitle
 
 \section{Introduction}
 
-Urban traffic patterns emerge from many local route choices made on shared road infrastructure rather than from centralized coordination. This decentralized interaction between heterogeneous drivers produces macroscopic states such as congestion patterns and traffic equilibria, making road systems a paradigmatic setting for self-organization in complex systems \citep{helbing2001traffic, nagel1992cellular, kerner2004physics, chowdhury2000statistical, helbing2009pedestrian}.
+Traffic patterns in cities emerge from many local route choices made on shared road infrastructure rather than from centralized coordination. This decentralized interaction between heterogeneous drivers produces macroscopic states such as congestion patterns and traffic equilibria, making road systems a paradigmatic setting for self-organization in complex systems \citep{helbing2001traffic, nagel1992cellular, kerner2004physics, chowdhury2000statistical, helbing2009pedestrian}.
 
 The behavior of such systems is governed by the emergence of macroscopic order from microscopic interactions. Through cooperative behavior, simple components can give rise to pattern formation, phase transitions, and system-wide stability \citep{haken1989,camazine2001}. In traffic networks, local route choices aggregate into collective flow patterns and systemic vulnerabilities. The importance of individual roads is therefore not determined by their physical properties alone, but by their role in shaping the global organization of flows. Identifying which local components exert the greatest influence on system-wide behavior is essential for understanding, predicting, and managing these self-organizing dynamics.
 
@@ -152,9 +152,9 @@ where $\beta_e$ is the free-flow travel time, $\alpha_e$ is a parameter that cap
 
 In this work, we focus on the linear approximation of~\cref{eq:bpr_general} (i.e., $k = 1$), which simplifies the travel time function to 
 \begin{align}\label{eq:linear-travel-time}
-t_e(f_e) = \alpha_e f_e + \beta_e, \quad  \in [t_e^0, t_e^{\mathrm{max}}].
+t_e(f_e)=\alpha_e f_e+\beta_e,\quad t_e(f_e)\in[t_e^0,t_e^{\mathrm{max}}].
 \end{align}
-The lower bound $t_e^0$ corresponds to the minimum travel time, which we approximate using walking-speed velocity, whereas the upper bound $t_e^{\mathrm{max}}$ is determined by the road’s speed limit.
+The lower bound $t_e^0$ corresponds to the free-flow travel time determined by the road speed limit, whereas the upper bound $t_e^{\mathrm{max}}$ is set by walking-speed travel time under extreme congestion.
 
 
 
@@ -177,11 +177,11 @@ We analyze traffic dynamics by modeling each driver as a rational agent seeking 
 
 While the user equilibrium represents an individually optimal state, it does not necessarily minimize overall congestion. In contrast, if routing is coordinated to minimize total travel time across the entire network (i.e., the social cost in \cref{eq:social-cost}),
 \begin{align}\label{eq:social-cost}
-sc(f_e) = \sum_{e\in E} f_e t_e(f_e),
+SC(f_e) = \sum_{e\in E} f_e t_e(f_e),
 \end{align}
 the system reaches a system optimum---a state in which traffic is distributed to maximize overall efficiency. This principle, also known as Wardrop's second principle~\cite{wardrop1952road}, yields an allocation in which some drivers may experience longer travel times than in user equilibrium, but total congestion and aggregate delay are minimized.
 
-The discrepancy between social cost at user equilibrium and at system optimum highlights inefficiencies introduced by selfish routing. This inefficiency is captured by the price of anarchy~\cite{koutsoupias1999worst}, which quantifies how strongly uncoordinated behavior degrades overall performance. In \cref{fig:user-eq-optimum}, we compare traffic flows $f_e$ in a simple network where $10$ drivers travel from node $A$ to node $D$ under (a) user equilibrium and (b) system optimum. In user equilibrium, each driver chooses routes to minimize individual travel time. In system optimum, routing is coordinated to minimize total travel time across all drivers. The total social cost is higher in user equilibrium ($sc(f_e)=200$) than in system optimum ($sc(f_e)=190$), illustrating how decentralized decisions can produce inefficient system-level outcomes.
+The discrepancy between social cost at user equilibrium and at system optimum highlights inefficiencies introduced by selfish routing. This inefficiency is captured by the price of anarchy~\cite{koutsoupias1999worst}, which quantifies how strongly uncoordinated behavior degrades overall performance. In \cref{fig:user-eq-optimum}, we compare traffic flows $f_e$ in a simple network where $10$ drivers travel from node $A$ to node $D$ under (a) user equilibrium and (b) system optimum. In user equilibrium, each driver chooses routes to minimize individual travel time. In system optimum, routing is coordinated to minimize total travel time across all drivers. The total social cost is higher in user equilibrium ($SC(f_e)=200$) than in system optimum ($SC(f_e)=190$), illustrating how decentralized decisions can produce inefficient system-level outcomes.
 
 \subsection{The Braess paradox}
 
@@ -199,7 +199,7 @@ For the following argument, consider the linear cost approximation in Eq.~\ref{e
 \begin{definition}[Braessian edge]
 An edge $e$ in a transportation network is called \emph{Braessian} if an increase in its capacity (or equivalently, a decrease in its free-flow travel time $\beta_e$) leads to an increase in the total social cost of the system. Formally, an edge $e$ is Braessian if
 \begin{align}
-    \frac{\partial sc(f_e)}{\partial \beta_e} < 0.
+    \frac{\partial SC(f_e)}{\partial \beta_e} < 0.
 \end{align}
 \end{definition}
 
@@ -228,7 +228,7 @@ The TAP is then stated as the optimization problem
     & f_e = \sum_{w \in W} f_e^w, \quad \forall e \in E.
 \end{align}
 Here, $f_e^w$ denotes the flow on edge $e$ associated with the origin-destination (OD) tuple $w$, while $f_e$ represents the total flow on edge $e$, obtained by summing over all OD tuples.
-For the analytical derivations below, each OD tuple is taken in the form $w=(o,d_1,d_2,\dots,d_n)$, i.e., one origin node $o$ supplying multiple destinations. This single-origin convention matches the computational setup and provides one gauge condition ($\lambda_o^w=0$) per subgraph. The opposite convention (multiple origins, one destination) can be treated analogously by reversing edge directions.
+For the analytical derivations below, each OD tuple is taken in the form $w=(o,d_1,d_2,\dots,d_n)$, i.e., one origin node $o$ supplying multiple destinations. This single-origin convention matches the computational setup and provides one gauge condition ($\lambda_o^w=0$) per tuple-specific support graph. The opposite convention (multiple origins, one destination) can be treated analogously by reversing edge directions.
 The demand corresponding to an OD tuple $w$ is represented by the OD matrix whose components are defined as:
 \begin{align}
     p^w_n &=\\
@@ -238,7 +238,7 @@ The demand corresponding to an OD tuple $w$ is represented by the OD matrix whos
         0, & \text{otherwise}.
     \end{cases}
 \end{align}
-Here, $y^o>0$ denotes the total demand injected at an origin node, and $y^d<0$ the total demand withdrawn at a destination node. Additionally, the demand vector $p^w$ is constructed to satisfy flow conservation: $\sum_{n \in V} p^w_n = 0.$
+Here, $y^o>0$ denotes the total demand injected at an origin node, and $y^d<0$ the total demand withdrawn at a destination node. Additionally, the demand vector $\vec{p}^{\,w}$ is constructed to satisfy flow conservation: $\sum_{n \in V} p^w_n = 0.$
 
 The objective function $\mathcal{F}(f_e)$ for the user equilibrium of the TAP is given by the cumulative travel cost experienced by all drivers on each edge, which is represented by the integration of the cost function~\cite{beckmann1956studies}
 \begin{align}
@@ -263,6 +263,16 @@ It is worth noting that, under the linear travel time approximation, the user-eq
 \subsection{Algebraic solution}\label{sec:tap-solution}
 In this section, we derive an analytical solution for the user equilibrium of the TAP using the linear cost function specified in Equation~\ref{eq:linear-travel-time}.
 To obtain a closed form, we first consider the equality-constrained system on a fixed active set (edges with positive flow). In practice, this active set is identified once from the full constrained problem, and the algebraic derivation below is then carried out on that fixed support.
+For consistent terminology, we define
+\begin{align}
+\mathcal{A} &:= \{(w,e)\in W\times E:\ f_e^w>0\}
+\quad\text{(stacked active set)},\\
+E^w &:= \{e\in E:\ f_e^w>0\}
+\quad\text{(active-edge set indexed by }w\text{)},\\
+G^w &:= (V,E^w)
+\quad\text{(active-support subgraph)}.
+\end{align}
+Thus, fixing the active set $\mathcal{A}$ is equivalent to fixing all active-support subgraphs $G^w$.
 The corresponding Lagrangian function is formulated as follows:
 \begin{align}\label{eq:lagrangian-deriv}
     \mathcal{L}(f_e^w, \lambda_n) &= \sum_{e \in E} \Bigl(\tfrac12\alpha_e f_e^{2}
@@ -305,18 +315,18 @@ The implications of this condition are illustrated in \cref{fig:lambda-condition
 \begin{align}
     \lambda_n \ge \lambda_n + \sum_{e\in C}\beta_e,
 \end{align}
-which is impossible if all $\beta_e>0$. Hence, under this positivity assumption, the active edge support of each OD-specific subgraph is acyclic. This statement concerns the active-support subgraphs used in the algebraic solution, not necessarily the full physical network.
+which is impossible if all $\beta_e>0$. Hence, under this positivity assumption, each active-support subgraph is acyclic. This statement concerns the active-support subgraphs used in the algebraic solution, not necessarily the full physical network.
 
-We can circumvent this limitation by decomposing the original graph into a set of \emph{flow subgraphs}. Consider an origin–destination tuple $w=(o,d_1,d_2,\dots,d_{|V|})$ and define the corresponding active-edge set by $E^w=\{e\in E: f_e^w>0\}$. Under \cref{eq:lambda-condition} with strictly positive $\beta_e$, the active-support subgraph $G^w(V,E^w)$ is acyclic.
+We can circumvent this limitation by decomposing the original graph into a set of active-support subgraphs. Consider an origin–destination tuple $w=(o,d_1,d_2,\dots,d_{|V|})$ and define the corresponding active-edge set by $E^w=\{e\in E: f_e^w>0\}$. Under \cref{eq:lambda-condition} with strictly positive $\beta_e$, the active-support subgraph $G^w(V,E^w)$ is acyclic.
 
 \begin{figure*}[ht]
     \centering
     \includegraphics[width=\textwidth]{assets/multicom-fig.pdf}
-    \caption{Decomposition of flows in an example graph under a positive‑flow constraint. \textbf{(a)} Total flow $f_e$, composed of the individual flow components $f_e^{w}$ shown in \textbf{(b)}–\textbf{(e)}. Each flow‑component subgraph $G^{w}(V,E^{w})$ also displays its respective OD‑matrix components $p_n^{w}$ colour‑coded on the nodes.}
+    \caption{Decomposition of flows in an example graph under a positive‑flow constraint. \textbf{(a)} Total flow $f_e$, composed of the individual flow components $f_e^{w}$ shown in \textbf{(b)}–\textbf{(e)}. Each active-support subgraph $G^{w}(V,E^{w})$ also displays its respective OD‑matrix components $p_n^{w}$ colour‑coded on the nodes.}
     \label{fig:pos-flow-comp}
 \end{figure*}
 
-Repeating this construction for multiple origin–destination pairs, where each node serves as an origin exactly once, naturally leads to a decomposition of the overall flow into subgraphs $G^{w}(V,E^{w})$. Each subgraph shares the same node set $V$ but includes only edges with positive flow values (so that \cref{eq:lambda-condition} is satisfied), i.e. $E^{w}\subseteq E$. Consequently, every OD‑tuple $w$ defines its own flow subgraph, ensuring that all flow values remain non‑negative. The effective edge‑incidence matrix for each subgraph can be expressed as
+Repeating this construction for multiple origin–destination pairs, where each node serves as an origin exactly once, naturally leads to a decomposition of the overall flow into active-support subgraphs $G^{w}(V,E^{w})$. Each active-support subgraph shares the same node set $V$ but includes only edges with positive flow values (so that \cref{eq:lambda-condition} is satisfied), i.e. $E^{w}\subseteq E$. Consequently, each index $w$ defines one active-support subgraph, ensuring that all flow values remain non‑negative. The effective edge‑incidence matrix for each active-support subgraph can be expressed as
 \begin{align}\label{eq:subgraph-edge-incidence}
     E^{w}_{ne}=
     \begin{cases}
@@ -326,7 +336,7 @@ Repeating this construction for multiple origin–destination pairs, where each 
     \end{cases}
 \end{align}
 
-By considering these subgraphs we can reformulate the system using a generalized node‑edge incidence matrix, where columns corresponding to edges that do not exist in subgraph $w$ are omitted:
+By considering these active-support subgraphs we can reformulate the system using a generalized node‑edge incidence matrix, where columns corresponding to edges that do not exist in active-support subgraph $w$ are omitted:
 \begin{align}\label{eq:generalized-incidence}
     \matr{\mathcal{E}}=
     \begin{bmatrix}
@@ -342,13 +352,13 @@ The total numbers of edges and nodes in all subflows are
     N_{t,e} &= \sum_{w\in W}|E^{w}|\le |E|\cdot|W|,\\
     N_{t,n} &= \sum_{w\in W}|V^{w}| = |V|\cdot|W|.
 \end{align}
-For convenient notation we introduce the function $e(i)$, which returns the index of the edge in the original graph that corresponds to the edge in the subgraph referred to by $i$ in the matrix $\matr{\mathcal{E}}$. 
+For convenient notation we introduce the function $e(i)$, which returns the index of the edge in the original graph that corresponds to the edge in the active-support subgraph referred to by $i$ in the matrix $\matr{\mathcal{E}}$. 
 
-This provides a structured way to represent the disaggregated flow components. If the subgraph structure is known, the problem can be solved immediately using Eq.~\ref{eq:deriv-lagrangian-zero}. The subgraph structure itself can be determined numerically by solving the problem once, after which the analytical formulation can be applied directly. This decomposition is particularly useful because it enables an analytical solution while preserving the non‑negativity of flows.
+This provides a structured way to represent the disaggregated flow components. If the active-support subgraph structure is known, the problem can be solved immediately using Eq.~\ref{eq:deriv-lagrangian-zero}. The active-support subgraph structure itself can be determined numerically by solving the problem once, after which the analytical formulation can be applied directly. This decomposition is particularly useful because it enables an analytical solution while preserving the non‑negativity of flows.
 Thus, we can adjust the parameters $\alpha_e$ and $\beta_e$ of the system to generate similar solutions. The advantage of this approach is that it allows us to obtain multiple solutions while requiring a numerical solver only once.
-The approach relies on the assumption that small variations in these parameters do not alter the subgraph structure, ensuring the validity of the analytical solution.\\
+The approach relies on the assumption that small variations in these parameters do not alter the active-support subgraph structure, ensuring the validity of the analytical solution.\\
 
-In Fig.~\ref{fig:pos-flow-comp} we illustrate the traffic flow on a small graph under a positive‑flow constraint. Panel (a) depicts the total flow $f_e$, while panels (b)–(e) show the corresponding flow decompositions for each source $w$. To determine the individual subgraph structures $G^{w}(V,E^{w})$, we first solve the full system numerically using the MOSEK or OSQP API for Python~\cite{mosek,stellato2020osqp} to obtain the respective Lagrange multipliers $\lambda_n^{w}$. In this example we consider four sources ($W=4$), leading to four subgraphs, which are shown in panels (b)–(e). Combining these four subgraphs reconstructs the total flow $f_e$ shown in panel (a).\\
+In Fig.~\ref{fig:pos-flow-comp} we illustrate the traffic flow on a small graph under a positive‑flow constraint. Panel (a) depicts the total flow $f_e$, while panels (b)–(e) show the corresponding flow decompositions for each source $w$. To determine the individual active-support subgraph structures $G^{w}(V,E^{w})$, we first solve the full system numerically using the MOSEK or OSQP API for Python~\cite{mosek,stellato2020osqp} to obtain the respective Lagrange multipliers $\lambda_n^{w}$. In this example we consider four sources ($W=4$), leading to four active-support subgraphs, which are shown in panels (b)–(e). Combining these four active-support subgraphs reconstructs the total flow $f_e$ shown in panel (a).\\
 
 %%%%%%%%%%%%%%%%%%%
 \subsection{Matrix formulation of the TAP}
@@ -367,7 +377,7 @@ and combine it with \cref{eq:deriv-lagrangian-zero} to obtain
 \end{pmatrix}
 =
 \begin{pmatrix}
--\boldsymbol{\beta}\\ \mathbf{p}
+-\boldsymbol{\beta}\\ \vec{p}
 \end{pmatrix}.
 \end{align}
 where the vector $\vec{f}$ collects the flow variables $f_e^{w}$ and the vector $\boldsymbol{\lambda}$ collects the Lagrange multipliers $\lambda_n^{w}$ for all nodes and OD‑tuples $w$.
@@ -379,7 +389,7 @@ The flow vector $\vec{f}$ is defined as
 \end{pmatrix}^{\!\top}
 \in\mathbb{R}^{N_{t,e}}.
 \end{align}
-The entries of $\vec{f}$ are ordered by stacking the flows for each OD‑tuple $w$ consecutively; the first $|E^{1}|$ elements correspond to subgraph $G^{1}(V,E^{1})$, the next $|E^{2}|$ to $G^{2}(V,E^{2})$, and so on (compare with~\cref{fig:pos-flow-comp}, panels (b)–(e)).
+The entries of $\vec{f}$ are ordered by stacking the flows for each OD‑tuple $w$ consecutively; the first $|E^{1}|$ elements correspond to active-support subgraph $G^{1}(V,E^{1})$, the next $|E^{2}|$ to $G^{2}(V,E^{2})$, and so on (compare with~\cref{fig:pos-flow-comp}, panels (b)–(e)).
 
 The vector of Lagrange multipliers $\boldsymbol{\lambda}$ is defined as
 \begin{align}
@@ -389,9 +399,9 @@ The vector of Lagrange multipliers $\boldsymbol{\lambda}$ is defined as
 \end{pmatrix}^{\!\top}
 \in\mathbb{R}^{N_{t,n}},
 \end{align}
-where $\vec{\lambda}^{w}$ contains the multipliers for subgraph $G^{w}(V,E^{w})$. The ordering follows the same stacking convention as for $\vec{f}$.
+where $\vec{\lambda}^{w}$ contains the multipliers for active-support subgraph $G^{w}(V,E^{w})$. The ordering follows the same stacking convention as for $\vec{f}$.
 
-Analogously, we define the right‑hand‑side vectors: $\boldsymbol{\beta}\in\mathbb{R}^{N_{t,e}}$ contains the edge‑cost coefficients $\beta_i=\beta_{e(i)}$, and $\mathbf{p}\in\mathbb{R}^{N_{t,n}}$ contains the nodal demands $p_n^{w}$.
+Analogously, we define the right‑hand‑side vectors: $\boldsymbol{\beta}\in\mathbb{R}^{N_{t,e}}$ contains the edge‑cost coefficients $\beta_i=\beta_{e(i)}$, and $\vec{p}\in\mathbb{R}^{N_{t,n}}$ contains the nodal demands $p_n^{w}$.
 
 Finally, the coefficient matrix $\matr{M}$ has the block structure
 \begin{align}
@@ -402,9 +412,9 @@ Finally, the coefficient matrix $\matr{M}$ has the block structure
 \end{pmatrix}
 \in\mathbb{R}^{\bigl[N_{t,e}+N_{t,n}\bigr]\times\bigl[N_{t,e}+N_{t,n}\bigr]},
 \end{align}
-where $\matr{\mathcal{E}}$ is the stacked edge–node incidence matrix introduced in \cref{eq:generalized-incidence}. Furthermore, the matrix $\mathbf{K}\in\mathbb{R}^{N_{t,e}\times N_{t,e}}$ is defined as
+where $\matr{\mathcal{E}}$ is the stacked edge–node incidence matrix introduced in \cref{eq:generalized-incidence}. Furthermore, the matrix $\matr{K}\in\mathbb{R}^{N_{t,e}\times N_{t,e}}$ is defined as
 \begin{align}
-\mathbf{K}=
+\matr{K}=
 \begin{cases}
 \alpha_{e(j)} & \text{if }e(l)=e(j),\\[2pt]
 0             & \text{otherwise.}
@@ -412,11 +422,11 @@ where $\matr{\mathcal{E}}$ is the stacked edge–node incidence matrix introduce
 \end{align}
 and $\matr{0}$ denotes the zero matrix.\\
 
-For many configurations this problem is underdetermined, because only the total flows on the edges matter, which allows for multiple configurations of how the subflows create these optimal total flows. Furthermore, the solutions depend only on differences in $\lambda$ values, so one reference $\lambda$ must be fixed for each subgraph. Finally, the condition that every subgraph must have the same inflow and outflow is also fixed by the structure of the equations. In order to obtain an invertible problem, each of these issues must be addressed.
+For many configurations this problem is underdetermined, because only the total flows on the edges matter, which allows for multiple configurations of how the subflows create these optimal total flows. Furthermore, the solutions depend only on differences in $\lambda$ values, so one reference $\lambda$ must be fixed for each active-support subgraph. Finally, the condition that every active-support subgraph must have the same inflow and outflow is also fixed by the structure of the equations. In order to obtain an invertible problem, each of these issues must be addressed.
 
 To fix how the subflows combine into the total flows, the most straightforward way is to minimise the square of the individual flows; this favours an even share between different flows on the individual edges. This is done by adding a small value $\delta$ to the diagonal of $\matr{K}$. This $\delta$ should be much smaller than all $\alpha$, so it only resolves the problem of multiple solutions without changing the total flows.
 
-The $\lambda$ value of the single source for each origin‑destination tuple is set to zero, and the continuity equation for that same node is removed in each subgraph because it is redundant.
+The $\lambda$ value of the single source for each origin‑destination tuple is set to zero, and the continuity equation for that same node is removed in each active-support subgraph because it is redundant.
 
 This gives the resulting matrix,
 \begin{align}
@@ -435,7 +445,7 @@ This matrix is invertible and the solutions for the flows and $\lambda$’s can 
 \end{pmatrix}
 = \tilde{\matr{M}}^{-1}
 \begin{pmatrix}
--\boldsymbol{\beta}\\ \tilde{\mathbf{p}}
+-\boldsymbol{\beta}\\ \tilde{\vec{p}}
 \end{pmatrix}.
 \end{align}
 
@@ -444,7 +454,7 @@ Using the Schur complement,
 \begin{align}\label{eq:schur-complement}
 \matr{S}= -\matr{\mathcal{E}}\matr{K}^{-1}\matr{\mathcal{E}}^{\!\top},
 \end{align}
-which corresponds to the negative of the Laplacian for the system of subgraphs. Then we can write
+which corresponds to the negative of the Laplacian for the system of active-support subgraphs. Then we can write
 \begin{align}\label{eq:M-mat}
 \matr{M}^{-1}=
 \begin{pmatrix}
@@ -459,22 +469,22 @@ Using this matrix formulation we provide a compact algebraic representation of t
 
 \subsection{Linearity of social cost}
 \begin{lemma}[Linearity of Social Cost in User Equilibrium]\label{lemma:linear}
-For a fixed active subgraph in the traffic assignment problem, the social cost at user equilibrium is linear in the free‑flow travel times $\beta_e$; across active-subgraph changes, it is piecewise linear.
+For a fixed active-support subgraph in the traffic assignment problem, the social cost at user equilibrium is linear in the free‑flow travel times $\beta_e$; across active-support subgraph changes, it is piecewise linear.
 \end{lemma}
 
 \begin{proof}
 First we note that the total social cost is given by
 \begin{align}
-    sc &= \sum_{e} f_e t_e\\
+    SC &= \sum_{e} f_e t_e\\
        &= \sum_{e} f_e\bigl(\alpha_e f_e+\beta_e\bigr)\\
        &= \sum_{w}\sum_{e} f_e^{w}\bigl(\alpha_e f_e+\beta_e\bigr).
 \end{align}
 From \cref{eq:deriv-lagrangian-zero} we know that this is equal to
 \begin{equation}
-    sc = \sum_{w}\sum_{e} f_e^{w}\bigl(\lambda_{o(e)}-\lambda_{d(e)}\bigr).
+    SC = \sum_{w}\sum_{e} f_e^{w}\bigl(\lambda^w_{o(e)}-\lambda^w_{d(e)}\bigr).
 \end{equation}
-where $\lambda_{o(e)}$ and $\lambda_{d(e)}$ mark the origin and destination nodes of edge $e$.
-By noting that the vector $p$ contains the flow starting at the unique origin node of subgraph $w$, $o(w)$, and ending at another node $n$, and that the total travel time is independent of the path taken, we have
+where $\lambda^w_{o(e)}$ and $\lambda^w_{d(e)}$ denote the OD-specific multipliers at the origin and destination nodes of edge $e$.
+By noting that the vector $\vec{p}$ contains the flow starting at the unique origin node of active-support subgraph $w$, $o(w)$, and ending at node $n$, and that the total travel time is independent of the path taken, we have
 \begin{equation}
 \begin{split}
 t^{w}_{\text{total},n}
@@ -485,40 +495,40 @@ t^{w}_{\text{total},n}
 \end{equation}
 Therefore
 \begin{equation}
-    sc = -\sum_{w}\sum_{n} p^{w}_{n}\,t^{w}_{\text{total},n}
+    SC = -\sum_{w}\sum_{n} p^{w}_{n}\,t^{w}_{\text{total},n}
         = -\sum_{w}\sum_{n}p^{w}_{n}\bigl(\lambda^{w}_{o(w)}-\lambda^{w}_{n}\bigr).
 \end{equation}
-Here $p$ is the reduced vector that contains destination withdrawal magnitudes only. Using the stacked notation from before and the fact that we set $\lambda^{w}_{o(w)}=0$, we obtain
+Here $\vec{p}$ is the reduced stacked vector that contains destination-withdrawal magnitudes only. Using the stacked notation from before and the fact that we set $\lambda^{w}_{o(w)}=0$, we obtain
 \begin{equation}
-    sc = -\sum_{i} p_{i}\lambda_{i}.
+    SC = -\sum_{i} p_{i}\lambda_{i}.
 \end{equation}
 With \cref{eq:flow-solution-mat} this can be rewritten as
 \begin{equation}
-    sc = -\sum_{i} p_{i}\bigl(\matr{S}^{-1}\matr{\mathcal{E}}\matr{K}^{-1}\boldsymbol{\beta}
-                     + \matr{S}^{-1}\mathbf{p}\bigr)_{i}.
+    SC = -\sum_{i} p_{i}\bigl(\matr{S}^{-1}\matr{\mathcal{E}}\matr{K}^{-1}\boldsymbol{\beta}
+                     + \matr{S}^{-1}\vec{p}\bigr)_{i}.
 \end{equation}
-Hence $sc$ is linear in every $\beta_{k}$. The derivative of $sc$ with respect to $\beta_{k}$ is
+Hence $SC$ is linear in every $\beta_{k}$. The derivative of $SC$ with respect to $\beta_{k}$ is
 \begin{equation}\label{eq:cost-gradient}
-    \frac{\partial sc}{\partial \beta_{k}}
-        = -\,p_{q}\,S^{-1}_{qp}\,\mathcal{E}_{pl}\,K^{-1}_{lj}\,\delta_{e(j),k},
+    \frac{\partial SC}{\partial \beta_{k}}
+        = -\,p_{q}\,\matr{S}^{-1}_{qp}\,\matr{\mathcal{E}}_{pl}\,\matr{K}^{-1}_{lj}\,\delta_{e(j),k},
 \end{equation}
 where summation over repeated indices is implied.
-The analytical expression for $K^{-1}_{lj}$ is
+The analytical expression for $\matr{K}^{-1}_{lj}$ is
 \begin{align}
-K^{-1}_{lj}= \frac{1}{\delta}
+\matr{K}^{-1}_{lj}= \frac{1}{\delta}
 \begin{cases}
 1-\dfrac{\alpha_{e(j)}}{\delta+\alpha_{e(j)}\,n(e(j))}, & l=j,\\[6pt]
 -\dfrac{\alpha_{e(j)}}{\delta+\alpha_{e(j)}\,n(e(j))}, & e(l)=e(j)\ \text{and}\ l\neq j,\\[6pt]
 0, & \text{otherwise.}
 \end{cases}
 \end{align}
-where $n(e(i))$ is the number of subflows that include edge $e(i)$. Defining $L_{lj}= \delta K^{-1}_{lj}$, \cref{eq:cost-gradient} becomes
+where $n(e(i))$ is the number of subflows that include edge $e(i)$. Defining $\matr{L}_{lj}= \delta \matr{K}^{-1}_{lj}$, \cref{eq:cost-gradient} becomes
 \begin{equation}
-    \frac{\partial sc}{\partial \beta_{k}}
-        = p_{q}\bigl(\mathcal{E}L\mathcal{E}^{\!\top}\bigr)^{-1}_{qp}\,
-          \mathcal{E}_{pl}\,L_{lj}\,\delta_{e(j),k}.
+    \frac{\partial SC}{\partial \beta_{k}}
+        = p_{q}\bigl(\matr{\mathcal{E}}\matr{L}\matr{\mathcal{E}}^{\!\top}\bigr)^{-1}_{qp}\,
+          \matr{\mathcal{E}}_{pl}\,\matr{L}_{lj}\,\delta_{e(j),k}.
 \end{equation}
-For a fixed active subgraph, this expression is independent of $\beta_k$ (indeed of $\boldsymbol{\beta}$), so the derivative is constant in that regime.
+For a fixed active-support subgraph, this expression is independent of $\beta_k$ (indeed of $\boldsymbol{\beta}$), so the derivative is constant in that regime.
 Writing it this way removes the prefactor $1/\delta$, which makes the step‑wise calculation on a computer more accurate, even for very small $\delta$.
 \end{proof}
 
@@ -649,7 +659,7 @@ Writing it this way removes the prefactor $1/\delta$, which makes the step‑wis
 
 In this proof, we used the algebraic solution of user-equilibrium flows (given by \cref{eq:flow-solution-mat} for the optimization problem in \cref{eq:tap-node-link}) to compute the derivative of social cost with respect to an edge's free-flow travel time $\beta_e$. We showed that this derivative is constant with respect to $\beta_e$. This property allows us to determine whether social cost increases or decreases as $\beta_e$ changes, thereby assessing whether individual edges contribute to system efficiency or inefficiency.\\
 
-However, there are important caveats. First, we must solve the system numerically once to identify subgraphs $G(V,E^w)$ where algebraic solutions exist. Second, linearity of social cost can only be established within a fixed active subgraph. If $\beta_e$ changes substantially, the effective subgraph may change, and the algebraic solution may no longer apply. Consequently, this approach characterizes the system under infinitesimal changes in $\beta_e$; equivalently, it establishes piecewise linearity (see Appendix~\ref{app:active-set-stability} for a quantitative stability scan and Appendix~\ref{app:local-breakpoint-predictor} for the local first-breakpoint predictor).
+However, there are important caveats. First, we must solve the system numerically once to identify active-support subgraphs $G^w(V,E^w)$ where algebraic solutions exist. Second, linearity of social cost can only be established within a fixed active-support subgraph. If $\beta_e$ changes substantially, the active-support subgraph may change, and the algebraic solution may no longer apply. Consequently, this approach characterizes the system under infinitesimal changes in $\beta_e$; equivalently, it establishes piecewise linearity (see Appendix~\ref{app:active-set-stability} for a quantitative stability scan and Appendix~\ref{app:local-breakpoint-predictor} for the local first-breakpoint predictor).
 
 
 \subsection{Social cost gradient centrality}\label{sec:scgc}
@@ -660,7 +670,7 @@ Edges with high SCGC values are critical for overall network performance, as inc
 
 Classical formulations of the Braess paradox \cite{braess1968paradoxon} identify paradoxical behavior through specific network topologies or through numerical experiments that remove edges and recompute equilibria. SCGC generalizes this concept: rather than requiring $|E|+1$ equilibrium computations, we obtain the gradient information analytically after solving the traffic assignment problem once. This makes the method computationally tractable even for large real-world networks.\\
 
-Leveraging \cref{lemma:linear}, the SCGC can be computed efficiently, as it only requires the pseudo-inverse of the Schur complement of the KKT system associated with the linearized problem. The measure provides immediate insight into whether small increases in edge cost parameters improve or worsen system efficiency. It is important to note that the method assumes the effective subgraph $G^w(V,E^w)$ remains unchanged under small variations in $\beta_e$. While valid for marginal perturbations, this assumption may not hold for larger interventions such as complete edge removal. Therefore, SCGC provides a reliable local indicator for identifying Braess edges and other critical links, while larger structural changes may require additional equilibrium computations.
+Leveraging \cref{lemma:linear}, the SCGC can be computed efficiently, as it only requires the pseudo-inverse of the Schur complement of the KKT system associated with the linearized problem. The measure provides immediate insight into whether small increases in edge cost parameters improve or worsen system efficiency. It is important to note that the method assumes the active-support subgraph $G^w(V,E^w)$ remains unchanged under small variations in $\beta_e$. While valid for marginal perturbations, this assumption may not hold for larger interventions such as complete edge removal. Therefore, SCGC provides a reliable local indicator for identifying Braess edges and other critical links, while larger structural changes may require additional equilibrium computations.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -682,7 +692,7 @@ To validate our approach, \cref{fig:braess-social-cost} illustrates the derivati
 
 Edges highlighted in red exhibit positive derivatives, indicating that increasing their costs leads to higher social costs. In contrast, edges highlighted in blue show negative derivatives, implying that raising their costs reduces total social cost, thereby classifying them as Braessian.
 
-Panels (b--f) further show that analytical and numerical solutions coincide in a neighborhood of the initial $\beta_e$ values (highlighted in matching colors), where the relationship between social cost and $\beta_e$ is piecewise linear. As $\beta_e$ deviates further from its baseline, discrepancies emerge due to structural changes in the effective subgraph, underscoring that the analytical approximation is most reliable for small perturbations of $\beta_e$ (see Appendices~\ref{app:active-set-stability} and~\ref{app:local-breakpoint-predictor}).
+Panels (b--f) further show that analytical and numerical solutions coincide in a neighborhood of the initial $\beta_e$ values (highlighted in matching colors), where the relationship between social cost and $\beta_e$ is piecewise linear. As $\beta_e$ deviates further from its baseline, discrepancies emerge due to structural changes in the active-support subgraph, underscoring that the analytical approximation is most reliable for small perturbations of $\beta_e$ (see Appendices~\ref{app:active-set-stability} and~\ref{app:local-breakpoint-predictor}).
 
 Additionally, in panels (b–e) we demonstrate that the SCGC is positive, meaning that increasing the corresponding $\beta_e$ values results in higher overall social cost. In contrast, panel (f) presents an edge with a negative SCGC, indicating that an increase in $\beta_e$ for this edge would reduce social cost, revealing a Braessian effect.
 
@@ -709,7 +719,7 @@ To illustrate this concept, \cref{fig:cost-gradient} presents traffic flows and 
 
 Next, we assigned node populations according to a power-law distribution with an exponent of $-1$, resulting in a few highly populated nodes and many nodes with relatively small populations, reflecting typical real-world urban network structures. Based on these populations, we constructed an origin–destination (OD) matrix in which a fraction of each node’s population travels to other nodes.
 
-In this formulation, we assume that the likelihood of drivers originating from or traveling to a node is determined solely by its population. As a result, the probability of traveling between any two nodes is independent of the distance separating them. While this assumption simplifies the model, a more realistic representation could incorporate distance effects, for example by using a gravity model~\cite{wassmer2024resilience}. However, since the networks considered here are typically on the scale of cities, including such distance-dependent factors does not substantially affect the results.
+In this formulation, we assume that the likelihood of drivers originating from or traveling to a node is determined solely by its population. As a result, the probability of traveling between any two nodes is independent of the distance separating them. While this assumption simplifies the model, a more realistic representation could incorporate distance effects, for example by using a gravity model~\cite{wassmer2024resilience}. We therefore interpret the synthetic benchmark as a controlled stress test of the method rather than as a calibrated demand model.
 
 
 Panel (a) of \cref{fig:cost-gradient} shows the resulting traffic flows, while panel (b) presents the corresponding SCGC values for each edge. Centrally located edges tend to exhibit both higher traffic flows and larger SCGC values. This is because more shortest paths pass through these edges, making them critical for network-wide accessibility. Consequently, even small perturbations to their free-flow travel times $\beta_e$ can strongly affect total social cost.
@@ -732,7 +742,7 @@ Panel (c) presents a scatter plot comparing traffic flows with SCGC values. Whil
 \subsection{Event-driven traffic in Cologne}\label{sec:football-cologne}
 \begin{figure*}[ht]
     \centering
-    \includegraphics[width=\textwidth]{assets/cologne-soccer.pdf}
+    \includegraphics[width=\textwidth]{assets/cologne-stadium-traffic.pdf}
     \caption{Visualization of vehicle flows and derivative social costs (SCGC) during a football event in Cologne, Germany. 
     Color coding in \textbf{(a)} shows vehicle flows $f_e$ across the road network. 
     Color coding in \textbf{(b)} depicts the derivative of the social cost with respect to $\beta_e$, highlighting Braess edges in blue.}
@@ -745,7 +755,7 @@ This yields a realistic yet computationally tractable representation of the city
 
 
 The primary source of traffic demand is the set of parking lots surrounding the football stadium. 
-Their total capacity is approximately $15{,}000$ parking spaces, which corresponds to $n_\mathrm{vehicles} = 15{,}000 \times 2 = 30{,}000$ trips, assuming two trips per parking space over the course of the event. 
+In the baseline calibration, this corresponds to $n_\mathrm{vehicles}=15{,}000$ event-related trips. 
 The parking locations are geocoded, and the nearest nodes in the network are defined as destination nodes $W$. 
 We then solve the traffic assignment problem as described in~\cref{sec:tap-solution}, yielding user equilibrium flows $f_e$ on each edge. 
 As shown in Figure~\ref{fig:football-cologne}\textbf{a}, the resulting flow pattern exhibits strong spatial concentration along the city’s main arterial roads leading to the stadium, which form the backbone of the event-related traffic system.\\
@@ -754,10 +764,22 @@ To assess the network’s vulnerability to inefficiencies, we compute the deriva
 Edges with negative SCGC values indicate Braess edges, links where a decrease in capacity, for example by lowering speed limits (i.e., increasing free-flow travel time), could paradoxically reduce overall travel costs. 
 Figure~\ref{fig:football-cologne}\textbf{b} highlights these edges in blue, revealing structurally important corridors and potentially counterproductive links whose management can substantially influence system performance.\\
 
-Across the entire network of 2,438 edges (with a total length of 2,105\,km), we identify 33 Braess edges, i.e., about 1.3\% of all links, with a combined length of roughly 24.8\,km. 
-The minimum SCGC value is $\min(\partial SC/\partial \beta_e) \approx -70$, indicating a strong potential for reducing total travel times through targeted interventions. 
-In contrast, the largest positive SCGC value reaches $\max(\partial SC/\partial \beta_e) \approx 2{,}846$, concentrated along a few high-capacity arterial corridors. 
+Across the entire network of 2,438 edges (with a total length of 2,105\,km), we identify 32 Braess edges in the baseline event scenario (about 1.31\% of all links), with a combined length of 24.1\,km (1.14\% of total network length). 
+The minimum SCGC value is $\min(\partial SC/\partial \beta_e) \approx -70.1$, while the largest positive value reaches $\max(\partial SC/\partial \beta_e) \approx 2{,}846.7$, concentrated along a few high-capacity arterial corridors. 
 The median SCGC is relatively low (2.66), reflecting that only a limited number of edges exert a dominant influence on network efficiency.\\
+
+To test robustness, we scale the same OD matrix by factors $0.8$, $1.0$, and $1.2$. 
+The number of Braess edges increases from 18 (0.74\%) at $0.8\times$ demand to 32 (1.31\%) at baseline and 66 (2.71\%) at $1.2\times$ demand; the corresponding Braess-edge length rises from 14.2\,km to 24.1\,km and 60.4\,km. 
+Hence, paradoxical corridors become more prevalent as event demand intensifies.\\
+
+We additionally perform a quantitative stress test of edge-ranking methods (SCGC vs flow vs betweenness vs random) by applying $+1\%$ perturbations to selected free-flow times and recomputing equilibrium social cost. 
+The chosen perturbation magnitude is deliberately local: it lies below the median active-set stability radius of about $3.5\%$ reported in Appendix~\ref{app:active-set-stability}, so first-order rankings are evaluated primarily within the locally stable regime.
+Intuitively, this asks a simple question: if we slightly ``stress'' the roads that each ranking declares most important, which ranking causes the largest system-wide damage under the same intervention budget? 
+In this sense, a better ranking should produce a larger realized increase in social cost because it identifies truly critical links.
+SCGC-linear ranking dominates all comparators across budgets $k=1,\dots,8$ for all three demand levels (win share 100\%). 
+At baseline demand, the mean realized increase in social cost across budgets is 0.01485\% for SCGC, versus 0.01098\% (flow), 0.00882\% (betweenness), and 0.00488\% (random). 
+For single-edge perturbations, the rank correlation between predicted and observed damage is $\rho\approx0.9997$ for SCGC, compared with $\rho\approx0.5457$ for flow and $\rho\approx0.1029$ for betweenness. 
+This confirms that SCGC is not only interpretable but also predictive for local intervention impact in this real-world case (see Appendix~\ref{app:intervention-validation}).\\
 
 Major arterial roads exhibit the highest positive SCGC values, reflecting their structural role in maintaining efficient access to the stadium. 
 These roads are critical for event-related traffic and should remain as free of disturbances as possible. 
@@ -810,7 +832,7 @@ However, low utilization alone does not necessarily imply low importance for ove
 To determine their actual impact on efficiency, we turn to the SCGC analysis.\\
 
 We next examine the derivative of the social cost with respect to $\beta_e$, $\partial SC/\partial \beta_e$ (SCGC), as described in \cref{sec:scgc}. 
-Figure~\ref{fig:potsdam}b shows the spatial distribution of SCGC values, which range from $\min(\partial SC/\partial \beta_e) \approx -16.4$ to $\max(\partial SC/\partial \beta_e) \approx 1{,}117.8$, with a mean of $200.4$ and a median of $143.3$. 
+Figure~\ref{fig:potsdam}b shows the spatial distribution of SCGC values, which range from $\min(\partial SC/\partial \beta_e) \approx -16.4$ to $\max(\partial SC/\partial \beta_e) \approx 1{,}017.8$, with a mean of $200.4$ and a median of $143.3$. 
 Most edges exhibit positive SCGC values, indicating that increasing travel times on these links would negatively affect overall network performance. 
 These edges largely overlap with the high-utilization corridors identified earlier, underscoring their central role in supporting efficient mobility.\\
 
@@ -826,6 +848,7 @@ This case study illustrates how combining utilization and SCGC analysis provides
 High-SCGC and high-utilization corridors form the operational backbone of the system and should be protected to maintain stable traffic flow. 
 Conversely, edges with low or negative SCGC values represent promising candidates for mode shift or other interventions that can promote more sustainable mobility without sacrificing efficiency. 
 Potsdam’s network structure thus reveals both clear operational priorities and opportunities for targeted, low-impact interventions.
+The cross-city intervention-ranking validation is provided in Appendix~\ref{app:intervention-validation}.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -849,6 +872,9 @@ From a conceptual standpoint, these findings align with the view of transport ne
 A key implication is that SCGC extends conventional edge ranking beyond purely structural notions of importance. Metrics based only on topology or observed flow volumes may identify heavily used corridors, but they do not directly quantify the marginal system-level consequence of changing a link attribute. SCGC closes this gap by linking each edge to a directional sensitivity: it indicates not only whether an edge matters, but also whether local improvement is expected to help or harm global efficiency under equilibrium behavior.
 
 At the same time, SCGC should be interpreted as a local response measure around the current operating point. Its value is strongest when used as a differential indicator that complements scenario-based planning, rather than replacing it. In practical terms, SCGC can prioritize where detailed simulations or intervention studies should be concentrated, thereby reducing the search space for policy design in large urban networks.
+This empirical usefulness is supported by the cross-city intervention validation (Appendix~\ref{app:intervention-validation}): across 42 tested budget points, SCGC ranking is best in 100\% of cases and attains substantially higher one-edge rank correlation with realized impact than flow or betweenness baselines.
+Interpreted as a binomial proportion, this 42/42 win record corresponds to an exact 95\% confidence interval of approximately $[91.6\%, 100\%]$.
+Put simply, when we perturb the top-ranked roads by the same small amount, the SCGC-ranked set consistently produces the largest realized deterioration in total network performance, confirming that SCGC better captures true marginal criticality.
 
 \subsection{Policy relevance}
 
@@ -862,7 +888,7 @@ Importantly, the presence of Braessian links does not imply that every capacity 
 
 \subsection{Limitations and future work}
 
-While the current formulation provides a clear analytical foundation, several important limitations remain. A key restriction arises from the fact that SCGC exploits the piecewise linearity of total social cost with respect to free-flow travel times, which is inherent to the underlying linear link cost functions and static equilibrium formulation. This allows for an elegant and computationally efficient derivation of marginal sensitivities, but it also means that SCGC is strictly valid only within a fixed active-subgraph (equilibrium) regime. When marginal changes in link attributes lead to discontinuous shifts in route choice patterns or the activation of alternative paths, the derivative structure itself changes. Consequently, SCGC captures local sensitivity around the current equilibrium but does not provide a global picture of how larger interventions might reshape flow distributions and system performance (Appendices~\ref{app:active-set-stability} and~\ref{app:local-breakpoint-predictor}).
+While the current formulation provides a clear analytical foundation, several important limitations remain. A key restriction arises from the fact that SCGC exploits the piecewise linearity of total social cost with respect to free-flow travel times, which is inherent to the underlying linear link cost functions and static equilibrium formulation. This allows for an elegant and computationally efficient derivation of marginal sensitivities, but it also means that SCGC is strictly valid only within a fixed active-support subgraph (equilibrium) regime. When marginal changes in link attributes lead to discontinuous shifts in route choice patterns or the activation of alternative paths, the derivative structure itself changes. Consequently, SCGC captures local sensitivity around the current equilibrium but does not provide a global picture of how larger interventions might reshape flow distributions and system performance (Appendices~\ref{app:active-set-stability} and~\ref{app:local-breakpoint-predictor}).
 
 This limitation is particularly relevant in networks with multiple near-optimal equilibria or where congestion dynamics are dominated by threshold effects. In such settings, even small infrastructure or demand changes can trigger qualitative shifts in traffic patterns that fall outside the linear response captured by SCGC. Future research should address this by extending the method to nonlinear cost functions or by embedding SCGC within dynamic traffic assignment frameworks that explicitly model time-dependent and path-switching behavior.
 
@@ -907,17 +933,16 @@ where $f_e$ describes the flow on edge $e$, while $f_r^w$ describes the flow on 
 \end{align}
 
 
-The objective function $\mathcal{F}(f_e)$ for the user equilibrium of the TAP (see Eq.~\ref{eq:tap-node-link}) is given by the cumulative travel cost experienced by all drivers on each edge, which is represented by the integration of the cost function
+For the linear-cost model used in this paper (see Eq.~\ref{eq:linear-travel-time}), the user-equilibrium objective is
 \begin{align}
-    \mathcal{F}_{\text{ue}}(f_e) &= \int_0^{f_{e}} t_{e}^{(k)}(u)du. \\
-    &= \frac{t_e^0 f_e \left( (f_e)^k + k + 1\right)}{k+1}  \nonumber
+    \mathcal{F}_{\text{ue}}(f_e)=\frac{1}{2}\alpha_e f_e^2+\beta_e f_e.
 \end{align}
 The objective function for the system optimum of the TAP is given by the total travel time experienced by all drivers (i.e., the social cost), given by
  \begin{align}
      \mathcal{F}_{\text{so}}(f_e) = f_e t_e.
  \end{align}
 Both objective functions are convex on the domain $[0, f_e^{\max}]$. Hence, the optimization problem~\eqref{eq:app-tap-link-path} can be solved in principle in polynomial time~\citep{kozlov1979polynomial}.
-This formulation of the TAP is referred to as the \textit{link-path} formulation, as it requires the calculation of all paths from all origin-destination pairs. However, the number of all possible paths between the origin-destination pair $w$, generally increases exponentially with the size of a graph [Bollobas? Newman?], making this formulation of the TAP impractical to use.\\
+This formulation of the TAP is referred to as the \textit{link-path} formulation, as it requires the calculation of all paths from all origin-destination pairs. However, the number of possible paths between an origin and a destination generally increases rapidly (often exponentially) with graph size, making this formulation impractical for large urban networks.\\
 
 
 To overcome the issue of having to compute all possible paths for a origin-destination pair, an alternative approach is to reformulate the TAP in a \textit{node-link} formulation. This can be achieved by defining the node-edge incidence matrix of a graph as 
@@ -938,7 +963,7 @@ Then, we can write down the TAP in the following way:
 \end{align}
 with 
 \begin{align}
-    \mathcal{F}(f_e) = 1/2 \alpha_ef_e^2  + \beta_e f_e.
+    \mathcal{F}(f_e) = \frac{1}{2}\alpha_e f_e^2 + \beta_e f_e.
 \end{align}
 where
 \begin{equation}
@@ -951,67 +976,53 @@ where
     \end{cases}   
 \end{split}
 \end{equation}
-We will refer to the vector $\mathbf{p}^w$ with the elements $p^w_i, i \in V$ as source-sink vector.
+We will refer to the vector $\vec{p}^{\,w}$ with the elements $p^w_i, i \in V$ as source-sink vector.
 
 \begin{lemma}[Equivalence of link-path and node-link constraints]
 The constraints of the link-path formulation of the Traffic Assignment Problem (TAP) in Equation~\ref{eq:app-tap-link-path} can be equivalently transformed into the constraints of the node-link formulation of TAP in Equation~\ref{eq:app-tap-node-link}.
 \end{lemma}
 \begin{proof}
-    We define the OD-pair-path incidence matrix $\Lambda_{rw}$ to be one if path $r \in R^w$ connects OD tuple $w$,
-    \begin{align}
-    \Lambda_{r}^w=
-        \begin{cases}
-            1, \text{ if path $r\in R^w$ connects OD tuple $w\in W$},\\
-            0, \text{ otherwise.}
-        \end{cases}
-    \end{align}
-Then, per definition the product of the node-edge incidence matrix and the edge-path incidence matrix is given by
+For one OD pair $w=(o,d)$, define edge flows induced by path flows as
 \begin{align}
-    &\sum_{e\in E} E_{ne}  \Delta^w_{e,r} =\\
-    &=\begin{cases}
-        1, & \text{ if $n$ is origin node of path $r \in R^w$},\\
-        -1, & \text{ if $n$ is the terminal node of path $r\in R^w$},\\
-        0, & \text{ otherwise.}
-    \end{cases}\\
-    &= \sum_{i \in V} \Lambda_{r}^{(n,i)} - \sum_{j \in V}\Lambda_{r}^{(j,n)}
+f_e^w=\sum_{r\in R^w}\Delta_{e,r}^w f_r^w,
+\qquad
+f_e=\sum_{w\in W}f_e^w.
 \end{align}
-Now, we use the definition of the flow over edge $e$ that emerges from the OD-pair $w$ which is given by
+Applying the node-edge incidence matrix to $f^w$ gives
 \begin{align}
-    f_e^w &= \sum_{r\in R^w} \Delta^w_{er}f_r^{w}\\
-    \text{such that } f_e &= \sum_{w\in W} f_e^w.
+\sum_{e\in E}E_{ne}f_e^w
+=\sum_{r\in R^w}\left(\sum_{e\in E}E_{ne}\Delta_{e,r}^w\right)f_r^w.
 \end{align}
-Thus,
-\begin{align*}
-    \sum_{e\in E} E_{ne}f_e^w &= \sum_{e\in E} E_{ne}  \sum_{r\in R^w} \Delta_{er}f_r^{w}\\
-    &= \sum_{r\in R^w}  \left( \sum_{e\in E} E_{ne} \Delta_{er} \right) f_r^{w}\\
-    &= \sum_{r\in R^w}  \left( \sum_{i\in V} \Lambda^{(n,i)}_r  f_r^{w}  - \sum_{j\in V} \Lambda^{(j,n)}_r f_r^{w} \right)\\
-    &= \sum_{r\in R^w} \left(  \sum_{i\in V}  \delta_{w, (n,i)}f_r^{w}  -  \sum_{j\in V}  \delta_{w, (j,n)} f_r^{w} \right)\\
-    &= \left( \sum_{r\in R^{(k,l)}} \sum_{i\in V}  \delta_{(k,l), (n,i)}f_r^{(k,l)} \right)\\
-    & -\left( \sum_{r\in R^{(k,l)}}\sum_{j\in V}  \delta_{(k,l), (j,n)} f_r^{(k,l)} \right).
-\end{align*}
-In the last steps we used the definition of the OD-pair-path incidence matrix that is equal to one if the path $r$ originates at $o$ and terminates at $d$ for OD tuple $w$, which can be written as Kronecker delta $\delta_{w, (o,d)}$. In the next line we resolve the Kronecker deltas and use the definition of the demand constraint of Equation~\ref{eq:app-tap-link-path}.
-\begin{equation}
-    \begin{split}
-    &\sum_{e\in E} E_{ne}f_e^w=\\ &=\sum_{r\in R^{(n,l)}}  f_r^{(n,l)}  - \sum_{r\in R^{(k,n)}}f_r^{(k,n)}\\
-    &= d^{(n,l)} - d^{(k,n)}\\
-    &= \begin{cases}
-        d^w, & \text{ if node $n$ is the origin in a OD tuple $w$},\\
-        -d^w, & \text{ if node $n$ is the destination in a OD tuple $w$},\\
-        0, &\text{ otherwise},
-    \end{cases}\\
-    &= p_n^w.
-    \end{split}
-    \label{eq:conserve_flows}
-\end{equation}
-In the last step we used the source-sink constraint from Equation~\ref{eq:app-tap-node-link}.
-Furthermore, the inequality constraints of Equation~\ref{eq:app-tap-link-path} can be transformed trivially into the inequality constraints of Equation~\ref{eq:app-tap-node-link}.
+For any path $r\in R^w$, the inner sum equals $+1$ at the origin node $o$, $-1$ at the destination node $d$, and $0$ elsewhere. Therefore
+\begin{align}
+\sum_{e\in E}E_{ne}f_e^w
+=
+\begin{cases}
+\sum_{r\in R^w}f_r^w, & n=o,\\
+-\sum_{r\in R^w}f_r^w, & n=d,\\
+0, & \text{otherwise}.
+\end{cases}
+\end{align}
+Using the link-path demand constraint $\sum_{r\in R^w}f_r^w=d^w$, we obtain
+\begin{align}
+\sum_{e\in E}E_{ne}f_e^w
+=
+\begin{cases}
+d^w, & n=o,\\
+-d^w, & n=d,\\
+0, & \text{otherwise},
+\end{cases}
+=p_n^w,
+\end{align}
+which is exactly the node-link flow-conservation constraint.
+The non-negativity constraints are preserved directly, since $f_r^w\ge 0$ implies $f_e^w\ge 0$ by construction.
 \end{proof}
 \begin{lemma}[Flow decomposition theorem~\citep{ahuja1995network, krylatov2020optimization}]
-    Every route flow $f_r$ has a unique representation as non-negative link flows $f_e$. [Conversely, every non-negative link flow may be represented as a route (though not necessary uniquely)].
+    Every route flow $f_r$ has a unique representation as non-negative link flows $f_e$. Conversely, every non-negative link flow can be represented by route flows, though this representation need not be unique.
 \end{lemma}
 
 \section{Active-set stability under local $\beta$-perturbations}\label{app:active-set-stability}
-To quantify the practical validity range of the fixed-active-subgraph assumption used by SCGC, we perform an active-set stability scan on a synthetic planar network. Starting from a baseline user equilibrium, we perturb one edge free-flow parameter $\beta_k$ at a time and recompute the multicommodity equilibrium. We then compare the resulting active set to the baseline active set.
+To quantify the practical validity range of the fixed active-support subgraph assumption used by SCGC, we perform an active-set stability scan on a synthetic planar network. Starting from a baseline user equilibrium, we perturb one edge free-flow parameter $\beta_k$ at a time and recompute the multicommodity equilibrium. We then compare the resulting active set to the baseline active set.
 
 In the experiment shown in \cref{fig:app-active-set-stability}, we use a synthetic network with 50 nodes and evaluate perturbations in the range $\Delta \beta_k/\beta_k \in [-5\%, 5\%]$ for a selected set of high-flow edges. Panel (a) reports, for each perturbed edge and perturbation level, the number of active-set entries that differ from baseline. Panel (b) summarizes two stability indicators over all tested edges: the exact stable fraction (black) and the mean Jaccard overlap of active sets (blue dashed).
 
@@ -1023,12 +1034,12 @@ Thus, $J=1$ indicates exact equality of active sets, while $J<1$ indicates struc
 
 The results show that active-set stability is highest close to $\Delta\beta_k=0$, where the exact stable fraction is 1 and the Jaccard similarity is exactly 1 for all tested edges. At the perturbation bounds, the mean Jaccard values remain high ($\bar J\approx 0.9978$ at $-5\%$ and $\bar J\approx 0.9983$ at $+5\%$), even though exact stability drops (stable fraction $\approx 0.55$ at $-5\%$). The global minimum over all tested edge--perturbation pairs is $J_{\min}\approx 0.9855$, observed for edge $(13,46)$ at $-5\%$, corresponding to 6 changed active-set entries out of 414 baseline active entries. The global maximum is $J_{\max}=1$, attained at $\delta=0$ (and also at several nonzero perturbations for robust edges). For this benchmark, the median local stability radius is approximately $3.5\%$, supporting the interpretation of SCGC as a local sensitivity measure that is reliable for small perturbations and should be complemented by full re-equilibration for larger interventions.
 
-\begin{figure*}[ht]
+\begin{figure}[t]
 \centering
-\includegraphics[width=\textwidth]{assets/active-set-stability-synthetic.pdf}
+\includegraphics[width=\columnwidth]{assets/active-set-stability-synthetic.pdf}
 \caption{Active-set stability under edge-wise perturbations of free-flow travel time. \textbf{(a)} Number of active-set entries that differ from the baseline active set when perturbing one edge parameter $\beta_k$ at a time. \textbf{(b)} Aggregate stability metrics across tested edges: exact stable fraction (black) and mean Jaccard similarity (blue dashed). The annotation reports the median local perturbation radius around zero for which exact active-set identity is preserved.}
 \label{fig:app-active-set-stability}
-\end{figure*}
+\end{figure}
 
 
 \section{Local first-breakpoint predictor}\label{app:local-breakpoint-predictor}
@@ -1084,6 +1095,62 @@ The concentration around the diagonal in some regimes indicates local usefulness
 \includegraphics[width=\columnwidth]{assets/linear-predictor-transfer.pdf}
 \caption{Transfer test of the raw local linear first-breakpoint predictor. Each point corresponds to one edge-direction sample; color indicates graph family and marker indicates demand/beta regime. The dashed line marks perfect agreement ($\hat r=r^{\mathrm{obs}}$). Deviations from the diagonal quantify mismatch between local linear prediction and observed active-set stability radius.}
 \label{fig:app-linear-predictor-transfer}
+\end{figure}
+
+
+\section{Intervention-ranking validation across real-world cases}\label{app:intervention-validation}
+To validate whether SCGC-based ranking predicts realized intervention impact beyond a single network, we run the same stress-test protocol on two distinct real-world cases: event-driven traffic in Cologne and daily urban traffic in Potsdam, each evaluated under three demand multipliers.
+Starting from each calibrated baseline equilibrium, we define a candidate set $C$ as the top-flow edges (Cologne: up to 60 candidates, Potsdam: up to 25 candidates). For each ranking method and budget $k$, we select the top-$k$ edges from $C$ and apply a positive perturbation to free-flow travel times:
+\begin{equation}
+\beta_e'=\beta_e(1+\rho), \qquad \rho=0.01.
+\end{equation}
+For each method $m\in\{$SCGC, flow, betweenness, random$\}$ and budget $k$, we choose a set $S_k^{(m)}$ of $k$ edges according to the method ranking and recompute the full multicommodity equilibrium.
+The realized impact is measured as
+\begin{equation}
+\Delta SC\!\left(S_k^{(m)}\right)=100\cdot\frac{SC(\beta')-SC(\beta)}{SC(\beta)}.
+\end{equation}
+Higher values indicate that the selected edges are more critical (larger system damage under the same perturbation budget). For the random baseline, we average over repeated random top-$k$ selections (20 repeats in Cologne, 16 in Potsdam).
+
+For SCGC, the local predicted single-edge impact is
+\begin{equation}
+\widehat{\Delta SC}_e=\frac{\partial SC}{\partial \beta_e}\,\Delta\beta_e,
+\end{equation}
+with $\Delta\beta_e=\rho\beta_e$ in the stress-test setting.
+We then compare this first-order ranking to realized one-edge impacts and to multi-edge top-$k$ outcomes.
+
+Across all tested real-world budgets and demand levels (42 budget points in total, i.e., $3\times(8+6)$ from Cologne budgets $k=1,\dots,8$ and Potsdam budgets $k=1,\dots,6$), SCGC attains a strict 100\% budget-wise win rate over flow, betweenness, and random baselines (exact binomial 95\% CI for the win share: $[91.6\%,100\%]$).
+Pooling both cities and all demand multipliers, the mean realized social-cost increase is 0.0219\% for SCGC (95\% bootstrap CI: 0.0180--0.0259), compared with 0.0164\% for flow (0.0133--0.0199), 0.0092\% for betweenness (0.0078--0.0106), and 0.0091\% for random (0.0070--0.0113). The mean SCGC--flow gap is 0.0054 percentage points (95\% bootstrap CI: 0.0046--0.0063), i.e., a relative gain of about 33\% over flow.
+For single-edge perturbations, pooled rank correlation between predicted and observed impact is $\rho\approx0.995$ for SCGC (95\% bootstrap CI: 0.989--0.999), versus $\rho\approx0.578$ for flow (0.543--0.609) and $\rho\approx0.041$ for betweenness (-0.011--0.088).
+These results support the claim that SCGC captures marginal system sensitivity more faithfully than topology-only or flow-only baselines across heterogeneous urban operating conditions.
+
+\begin{table}[htbp]
+\centering
+\caption{Intervention-validation summary pooled across Cologne and Potsdam over all tested demand multipliers.}
+\begin{tabular}{lcc}
+\hline
+Method & Mean realized $\Delta SC$ [\%] & Mean Spearman $\rho$ \\
+\hline
+SCGC-linear & 0.0219 & 0.995 \\
+Flow & 0.0164 & 0.578 \\
+Betweenness & 0.0092 & 0.041 \\
+Random & 0.0091 & -- \\
+\hline
+\end{tabular}
+\label{tab:app-intervention-validation}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\columnwidth]{assets/cologne-stadium-intervention-validation.pdf}
+\caption{Case-level intervention curves for Cologne: realized social-cost change $\Delta SC$ under $+1\%$ perturbations of selected $\beta_e$ values as a function of intervention budget $k$. Curves show median performance across demand multipliers; shaded bands indicate interquartile ranges.}
+\label{fig:app-intervention-validation-cologne}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\columnwidth]{assets/potsdam-intervention-validation.pdf}
+\caption{Case-level intervention curves for Potsdam, using the same protocol as in Cologne. SCGC remains the best-performing ranking across all tested budgets and demand multipliers.}
+\label{fig:app-intervention-validation-potsdam}
 \end{figure}
 
 
