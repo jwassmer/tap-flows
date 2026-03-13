@@ -1,0 +1,146 @@
+\documentclass[11pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{enumitem}
+\usepackage{parskip}
+\usepackage{hyperref}
+
+\setlist[enumerate]{leftmargin=*, label=\arabic*.}
+\setlist[itemize]{leftmargin=*}
+
+\begin{document}
+
+\begin{flushright}
+13 March 2026
+\end{flushright}
+
+\noindent\textbf{Re:} Manuscript EPJS-D-26-00109\\
+\textbf{Title:} A Social-Cost Sensitivity Centrality for Traffic Networks
+
+\vspace{1em}
+
+\noindent Dear Editor,
+
+We thank you and the reviewers for the careful and constructive evaluation of our manuscript. We appreciate the positive overall assessment and the specific suggestions, which helped us improve the clarity and presentation of the paper.
+
+We have revised the manuscript accordingly. Below we provide a point-by-point response to all reviewer comments and describe the exact changes made in the revised version.
+
+For convenience, the responses below refer to the revised manuscript and bibliography files currently used for the resubmission.
+
+\section*{Reviewer \#1}
+
+We thank the reviewer for the positive assessment of the manuscript, for noting its suitability for a physics audience, and for the constructive suggestion regarding richer traffic-demand models.
+
+\begin{enumerate}
+\item \textbf{Comment:} The applications are somewhat simplistic because the OD matrices are based on simplified assumptions. The reviewer suggests that future work should test the usefulness of the measure on data from an agent-based model.
+
+\textbf{Response:} We agree with the reviewer that the OD construction used in the present manuscript is simplified and that richer demand constructions are an important next step. Our present goal was to establish the analytical sensitivity measure and to test it on transparent synthetic and real-world examples with a tractable linear TAP formulation. To acknowledge this limitation more explicitly, we expanded the discussion of future work.
+
+\textbf{Exact changes made:} In the Discussion, we expanded the future-work paragraph to better situate this point within the broader traffic-modeling literature. In particular, we added the suggested paper by Firat and Eroglu, "Data-driven modeling of traffic flow in macroscopic network systems" (Chaos 35, 093134, 2025), as a citation to recent data-driven macroscopic traffic-network modeling. We also clarified that a natural next step is to evaluate SCGC under richer demand constructions, including empirically calibrated OD matrices and other more realistic mobility-demand estimates, and we now note that related macroscopic network formulations can avoid relying on fixed OD demand assumptions.
+
+This addition appears in the revised manuscript in the limitations and future-work discussion.
+
+\item \textbf{Comment:} The reference list contains capitalization problems. In particular, words such as Braess are not capitalized correctly in some references, and some German words should also remain capitalized.
+
+\textbf{Response:} We agree and have corrected the affected bibliography entries so that proper nouns and language-specific capitalization are preserved by the BibTeX style.
+
+\textbf{Exact changes made:} We protected capitalization in the bibliography for the affected entries, including references containing ``Braess'' and German nouns. This includes, among others:
+
+\begin{itemize}
+\item ``Understanding \{Braess\}' paradox in power grids''
+\item ``The prevalence of \{Braess\}' paradox''
+\item ``\{Braess\}' paradox: some new insights''
+\item ``\{Braess\}' paradox: A cooperative game-theoretic point of view''
+\item ``\{Road Paper\}. Some Theoretical Aspects of Road Traffic Research''
+\item ``\{\"U\}ber ein \{Paradoxon\} aus der \{Verkehrsplanung\}''
+\item ``Predicting \{Braess\}' Paradox in Supply and Transport Networks''
+\end{itemize}
+
+These corrections were made directly in the revised bibliography file used by the manuscript, including the entries corresponding to Braess-related references and the original German title.
+\end{enumerate}
+
+\section*{Reviewer \#2}
+
+We thank the reviewer for the careful reading and for the helpful suggestions. We have addressed each point in the revised manuscript as follows.
+
+\begin{enumerate}
+\item \textbf{Comment:} ``It is not clear whether the Cost function mentioned as sub title A in section II same as that defined in eqn 3. If not, what is the definition for cost function? Is it directly related to travel time?''
+
+\textbf{Response:} We agree that the terminology was not sufficiently explicit. In the original version, the distinction between the edge-level travel-time function and the network-level social cost could be read as ambiguous.
+
+\textbf{Exact changes made:} We clarified this distinction in the theory section. The revised manuscript now explicitly states that the term ``cost function'' refers to the edge-level travel-time function $t_e(f_e)$, whereas $SC(f_e)$ denotes the network-level social cost, defined as the flow-weighted sum of travel times over all edges.
+
+The revised text now reads:
+
+\begin{quote}
+Throughout this paper, the term ``cost function'' refers to the edge-level travel-time function $t_e(f_e)$. The network-level quantity $SC(f_e)$ introduced below is the corresponding social cost, i.e. the flow-weighted sum of travel times over all edges.
+\end{quote}
+
+In addition, the social cost is then defined explicitly in Eq.~(3) as
+\[
+SC(f_e) = \sum_{e \in E} f_e t_e(f_e).
+\]
+
+This change makes the distinction between local travel-time functions and the global objective precise.
+
+\item \textbf{Comment:} ``It is not very clear how the values of traffic flow $f_e$ on edge $e$ are assigned in a specific case, for eg in Fig 1 and later? Also in the calculation of $SC(f_e)$ for the two cases considered, how is $f_e$ chosen?''
+
+\textbf{Response:} We agree that the original wording did not make explicit enough that the flows in the example figures are not assigned manually. They are computed as solutions of the corresponding traffic assignment problem under the stated OD demand and link cost functions.
+
+\textbf{Exact changes made:} We added an explicit clarification in the discussion of Fig.~1. The revised manuscript now states that, in both panels, the edge flows $f_e$ are obtained by solving the respective traffic assignment problem for a fixed OD demand of 10 drivers from $A$ to $D$ under the stated link cost functions, and that the reported $SC$ values are then computed by inserting these resulting flows into Eq.~(3).
+
+The revised sentence reads:
+
+\begin{quote}
+In both panels, the edge flows $f_e$ are obtained by solving the respective traffic assignment problem for a fixed OD demand of 10 drivers from $A$ to $D$ under the stated link cost functions; the reported $SC$ values are then computed by inserting these resulting flows into Eq.~(3).
+\end{quote}
+
+This change makes clear both how the example flows are generated and how the social-cost values are evaluated.
+
+\item \textbf{Comment:} ``In the text and in caption for fig 2, it is mentioned from node A (red) to node B (blue). But in fig 2, node B is not blue in colour. This can be confusing and needs editing.''
+
+\textbf{Response:} We thank the reviewer for catching this inconsistency. The original wording was incorrect. In the figure itself, the origin is node $A$ (red) and the destination is node $D$ (blue), not node $B$.
+
+\textbf{Exact changes made:} We corrected both the figure caption and the corresponding body text so that they match the actual figure.
+
+The caption now states:
+
+\begin{quote}
+Network topology with 40 drivers traveling from origin $A$ (red) to destination $D$ (blue) \dots
+\end{quote}
+
+The main text now states:
+
+\begin{quote}
+In this example, 40 drivers travel from node $A$ (red) to node $D$ (blue).
+\end{quote}
+
+This resolves the mismatch between the text and the figure.
+\end{enumerate}
+
+\section*{Additional Minor Revisions Made During Resubmission}
+
+In addition to the direct reviewer requests above, we made several minor consistency improvements while preparing the revision:
+
+\begin{enumerate}
+\item We refined the wording around the linearized derivation of SCGC so that the manuscript now refers to the active-set linear system / active-set optimality system rather than using imprecise shorthand, while keeping the scope of the local-sensitivity interpretation unchanged.
+\end{enumerate}
+
+These edits do not alter the scientific conclusions of the manuscript; they improve clarity, consistency, and presentation.
+
+For convenience, we also provide a submission-to-revision \texttt{latexdiff} alongside the revised files.
+
+We hope that the revised manuscript is now suitable for publication in \textit{The European Physical Journal Special Topics}, and we thank the editor and reviewers again for their time and constructive feedback.
+
+\vspace{1em}
+
+\noindent Sincerely,
+
+\vspace{2em}
+
+\noindent Jonas Wassmer\\
+on behalf of all authors
+
+\end{document}
