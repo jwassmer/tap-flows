@@ -48,3 +48,7 @@ literature/
 
 # Generated revision note auxiliaries
 manuscript/*Notes.bib
+# Local notes and scratch code
+notes/
+messy_code/
+
